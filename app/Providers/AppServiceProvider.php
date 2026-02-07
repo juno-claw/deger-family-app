@@ -3,13 +3,16 @@
 namespace App\Providers;
 
 use App\Models\CalendarEvent;
+use App\Models\FamilyList;
 use App\Models\Note;
 use App\Policies\CalendarEventPolicy;
+use App\Policies\FamilyListPolicy;
 use App\Policies\NotePolicy;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
 
@@ -29,7 +32,10 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Gate::policy(CalendarEvent::class, CalendarEventPolicy::class);
+        Gate::policy(FamilyList::class, FamilyListPolicy::class);
         Gate::policy(Note::class, NotePolicy::class);
+
+        Route::model('list', FamilyList::class);
 
         $this->configureDefaults();
     }
