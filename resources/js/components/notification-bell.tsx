@@ -1,15 +1,17 @@
-import { Link } from '@inertiajs/react';
+import { Link, usePage } from '@inertiajs/react';
 import { Bell } from 'lucide-react';
+import { useNotifications } from '@/hooks/use-notifications';
 import { cn } from '@/lib/utils';
+import { index } from '@/actions/App/Http/Controllers/NotificationController';
+import type { SharedData } from '@/types';
 
-interface NotificationBellProps {
-    unreadCount?: number;
-}
+export function NotificationBell() {
+    const { notificationCount } = usePage<SharedData>().props;
+    const { unreadCount } = useNotifications(notificationCount);
 
-export function NotificationBell({ unreadCount = 0 }: NotificationBellProps) {
     return (
         <Link
-            href="/notifications"
+            href={index.url()}
             className="relative inline-flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
             aria-label={`Benachrichtigungen${unreadCount > 0 ? ` (${unreadCount} ungelesen)` : ''}`}
         >

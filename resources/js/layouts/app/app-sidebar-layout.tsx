@@ -16,7 +16,7 @@ export default function AppSidebarLayout({
             <AppContent variant="sidebar" className="overflow-x-hidden">
                 <AppSidebarHeader
                     breadcrumbs={breadcrumbs}
-                    right={<NotificationBell unreadCount={0} />}
+                    right={<NotificationBell />}
                 />
                 <div className="pb-20 md:pb-0">
                     {children}

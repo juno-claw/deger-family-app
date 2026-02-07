@@ -141,3 +141,50 @@
         @apply bg-background text-foreground;
     }
 }
+
+/* Tiptap rich text editor */
+.tiptap {
+    outline: none;
+}
+
+.tiptap p {
+    margin: 0.25em 0;
+}
+
+.tiptap h2 {
+    font-size: 1.5em;
+    font-weight: 600;
+    margin: 0.5em 0 0.25em;
+    line-height: 1.3;
+}
+
+.tiptap h3 {
+    font-size: 1.17em;
+    font-weight: 600;
+    margin: 0.4em 0 0.2em;
+    line-height: 1.3;
+}
+
+.tiptap strong {
+    font-weight: 700;
+}
+
+.tiptap em {
+    font-style: italic;
+}
+
+.tiptap u {
+    text-decoration: underline;
+}
+
+.tiptap s {
+    text-decoration: line-through;
+}
+
+.tiptap p.is-editor-empty:first-child::before {
+    content: attr(data-placeholder);
+    float: left;
+    height: 0;
+    pointer-events: none;
+    opacity: 0.4;
+}

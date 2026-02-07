@@ -3,16 +3,17 @@
 use App\Http\Controllers\CalendarEventController;
 use App\Http\Controllers\ListController;
 use App\Http\Controllers\ListItemController;
-use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\NoteController;
+use App\Http\Controllers\NotificationController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
-use Laravel\Fortify\Features;
 
 Route::get('/', function () {
-    return Inertia::render('welcome', [
-        'canRegister' => Features::enabled(Features::registration()),
-    ]);
+    if (auth()->check()) {
+        return redirect()->route('dashboard');
+    }
+
+    return redirect()->route('login');
 })->name('home');
 
 Route::middleware(['auth', 'verified'])->group(function () {
