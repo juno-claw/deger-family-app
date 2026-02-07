@@ -27,9 +27,15 @@ class NotificationApiController extends Controller
 
     /**
      * Push a notification to another user.
+     *
+     * Only users with the 'ai_agent' role are allowed to push notifications.
      */
     public function push(Request $request): NotificationResource
     {
+        if (! auth()->user()->isAiAgent()) {
+            abort(403, 'Only AI agents may push notifications.');
+        }
+
         $validated = $request->validate([
             'user_id' => 'required|exists:users,id',
             'title' => 'required|string|max:255',

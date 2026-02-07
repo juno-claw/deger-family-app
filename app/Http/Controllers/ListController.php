@@ -5,17 +5,22 @@ namespace App\Http\Controllers;
 use App\Http\Requests\StoreListRequest;
 use App\Http\Requests\UpdateListRequest;
 use App\Models\FamilyList;
-use App\Models\Notification;
 use App\Models\User;
+use App\Traits\HasSharing;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
+use Inertia\Response;
 
 class ListController extends Controller
 {
+    use HasSharing;
+
     /**
      * Display a listing of the lists.
      */
-    public function index()
+    public function index(): Response
     {
         $lists = FamilyList::accessibleBy(auth()->user())
             ->with(['owner', 'items', 'sharedWith'])
@@ -31,7 +36,7 @@ class ListController extends Controller
     /**
      * Store a newly created list.
      */
-    public function store(StoreListRequest $request)
+    public function store(StoreListRequest $request): RedirectResponse
     {
         FamilyList::create([
             ...$request->validated(),
@@ -44,7 +49,7 @@ class ListController extends Controller
     /**
      * Display the specified list.
      */
-    public function show(FamilyList $list)
+    public function show(FamilyList $list): Response
     {
         $this->authorize('view', $list);
 
@@ -62,7 +67,7 @@ class ListController extends Controller
     /**
      * Update the specified list.
      */
-    public function update(UpdateListRequest $request, FamilyList $list)
+    public function update(UpdateListRequest $request, FamilyList $list): RedirectResponse
     {
         $this->authorize('update', $list);
 
@@ -74,7 +79,7 @@ class ListController extends Controller
     /**
      * Remove the specified list.
      */
-    public function destroy(FamilyList $list)
+    public function destroy(FamilyList $list): RedirectResponse
     {
         $this->authorize('delete', $list);
 
@@ -86,40 +91,43 @@ class ListController extends Controller
     /**
      * Share the list with another user.
      */
-    public function share(Request $request, FamilyList $list)
+    public function share(Request $request, FamilyList $list): RedirectResponse
     {
-        $this->authorize('share', $list);
-
-        $request->validate([
-            'user_id' => 'required|exists:users,id',
-            'permission' => 'required|in:view,edit',
-        ]);
-
-        $list->sharedWith()->syncWithoutDetaching([
-            $request->user_id => ['permission' => $request->permission],
-        ]);
-
-        Notification::create([
-            'user_id' => $request->user_id,
-            'from_user_id' => auth()->id(),
-            'type' => 'list_shared',
-            'title' => 'Liste geteilt',
-            'message' => auth()->user()->name . ' hat die Liste "' . $list->title . '" mit dir geteilt.',
-            'data' => ['list_id' => $list->id],
-        ]);
-
-        return redirect()->back();
+        return $this->performShare($request, $list);
     }
 
     /**
      * Unshare the list from a user.
      */
-    public function unshare(Request $request, FamilyList $list)
+    public function unshare(Request $request, FamilyList $list): RedirectResponse
     {
-        $this->authorize('share', $list);
+        return $this->performUnshare($request, $list);
+    }
 
-        $list->sharedWith()->detach($request->user_id);
+    // ── HasSharing implementation ─────────────────────
 
-        return redirect()->back();
+    protected function sharingPivotField(): string
+    {
+        return 'permission';
+    }
+
+    protected function sharingNotificationType(): string
+    {
+        return 'list_shared';
+    }
+
+    protected function sharingNotificationTitle(): string
+    {
+        return 'Liste geteilt';
+    }
+
+    protected function sharingNotificationMessage(Model $resource): string
+    {
+        return auth()->user()->name.' hat die Liste "'.$resource->title.'" mit dir geteilt.';
+    }
+
+    protected function sharingNotificationData(Model $resource): array
+    {
+        return ['list_id' => $resource->id];
     }
 }

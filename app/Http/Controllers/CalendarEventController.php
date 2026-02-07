@@ -5,26 +5,27 @@ namespace App\Http\Controllers;
 use App\Http\Requests\StoreCalendarEventRequest;
 use App\Http\Requests\UpdateCalendarEventRequest;
 use App\Models\CalendarEvent;
-use App\Models\Notification;
 use App\Models\User;
+use App\Traits\HasSharing;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
+use Inertia\Response;
 
 class CalendarEventController extends Controller
 {
+    use HasSharing;
+
     /**
-     * Default color per user ID.
+     * Default fallback color when no color is set on the event.
      */
-    private const USER_COLORS = [
-        1 => '#3b82f6', // Olli - blau
-        2 => '#ec4899', // Sabsy - pink
-        3 => '#22c55e', // Juno - gruen
-    ];
+    private const DEFAULT_COLOR = '#6b7280';
 
     /**
      * Display a listing of calendar events for a given month.
      */
-    public function index(Request $request)
+    public function index(Request $request): Response
     {
         $month = (int) $request->query('month', now()->month);
         $year = (int) $request->query('year', now()->year);
@@ -45,10 +46,10 @@ class CalendarEventController extends Controller
 
         $events->load(['owner', 'sharedWith']);
 
-        // Apply default color coding based on owner
-        $events->each(function ($event) {
+        // Apply default color if none is set
+        $events->each(function ($event): void {
             if (is_null($event->color)) {
-                $event->color = self::USER_COLORS[$event->owner_id] ?? '#6b7280';
+                $event->color = self::DEFAULT_COLOR;
             }
         });
 
@@ -60,7 +61,7 @@ class CalendarEventController extends Controller
     /**
      * Store a newly created calendar event.
      */
-    public function store(StoreCalendarEventRequest $request)
+    public function store(StoreCalendarEventRequest $request): RedirectResponse
     {
         CalendarEvent::create(array_merge(
             $request->validated(),
@@ -73,7 +74,7 @@ class CalendarEventController extends Controller
     /**
      * Display the specified calendar event.
      */
-    public function show(CalendarEvent $event)
+    public function show(CalendarEvent $event): Response
     {
         $this->authorize('view', $event);
 
@@ -85,7 +86,7 @@ class CalendarEventController extends Controller
     /**
      * Update the specified calendar event.
      */
-    public function update(UpdateCalendarEventRequest $request, CalendarEvent $event)
+    public function update(UpdateCalendarEventRequest $request, CalendarEvent $event): RedirectResponse
     {
         $this->authorize('update', $event);
 
@@ -97,7 +98,7 @@ class CalendarEventController extends Controller
     /**
      * Remove the specified calendar event.
      */
-    public function destroy(CalendarEvent $event)
+    public function destroy(CalendarEvent $event): RedirectResponse
     {
         $this->authorize('delete', $event);
 
@@ -109,27 +110,45 @@ class CalendarEventController extends Controller
     /**
      * Share the calendar event with another user.
      */
-    public function share(Request $request, CalendarEvent $event)
+    public function share(Request $request, CalendarEvent $event): RedirectResponse
     {
-        $this->authorize('share', $event);
+        return $this->performShare($request, $event);
+    }
 
-        $request->validate([
-            'user_id' => 'required|exists:users,id',
-        ]);
+    // ── HasSharing implementation ─────────────────────
 
-        $event->sharedWith()->syncWithoutDetaching([
-            $request->user_id => ['status' => 'pending'],
-        ]);
+    protected function sharingPivotField(): string
+    {
+        return 'status';
+    }
 
-        Notification::create([
-            'user_id' => $request->user_id,
-            'from_user_id' => auth()->id(),
-            'type' => 'event_shared',
-            'title' => 'Kalender-Einladung',
-            'message' => auth()->user()->name . ' hat dich zu "' . $event->title . '" eingeladen.',
-            'data' => ['event_id' => $event->id],
-        ]);
+    protected function sharingRequiresPermission(): bool
+    {
+        return false;
+    }
 
-        return redirect()->back();
+    protected function sharingDefaultPermission(): string
+    {
+        return 'pending';
+    }
+
+    protected function sharingNotificationType(): string
+    {
+        return 'event_shared';
+    }
+
+    protected function sharingNotificationTitle(): string
+    {
+        return 'Kalender-Einladung';
+    }
+
+    protected function sharingNotificationMessage(Model $resource): string
+    {
+        return auth()->user()->name.' hat dich zu "'.$resource->title.'" eingeladen.';
+    }
+
+    protected function sharingNotificationData(Model $resource): array
+    {
+        return ['event_id' => $resource->id];
     }
 }

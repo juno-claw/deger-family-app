@@ -5,17 +5,23 @@ namespace App\Http\Controllers;
 use App\Http\Requests\StoreNoteRequest;
 use App\Http\Requests\UpdateNoteRequest;
 use App\Models\Note;
-use App\Models\Notification;
 use App\Models\User;
+use App\Traits\HasSharing;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
+use Inertia\Response;
 
 class NoteController extends Controller
 {
+    use HasSharing;
+
     /**
      * Display a listing of notes.
      */
-    public function index()
+    public function index(): Response
     {
         $notes = Note::accessibleBy(auth()->user())
             ->with(['owner', 'sharedWith'])
@@ -36,7 +42,7 @@ class NoteController extends Controller
     /**
      * Store a newly created note.
      */
-    public function store(StoreNoteRequest $request)
+    public function store(StoreNoteRequest $request): RedirectResponse
     {
         $note = Note::create([
             ...$request->validated(),
@@ -49,7 +55,7 @@ class NoteController extends Controller
     /**
      * Display the specified note.
      */
-    public function show(Note $note)
+    public function show(Note $note): Response
     {
         $this->authorize('view', $note);
 
@@ -63,7 +69,7 @@ class NoteController extends Controller
     /**
      * Update the specified note.
      */
-    public function update(UpdateNoteRequest $request, Note $note)
+    public function update(UpdateNoteRequest $request, Note $note): RedirectResponse|JsonResponse
     {
         $this->authorize('update', $note);
 
@@ -80,7 +86,7 @@ class NoteController extends Controller
     /**
      * Remove the specified note.
      */
-    public function destroy(Note $note)
+    public function destroy(Note $note): RedirectResponse
     {
         $this->authorize('delete', $note);
 
@@ -92,7 +98,7 @@ class NoteController extends Controller
     /**
      * Toggle the pinned status of a note.
      */
-    public function togglePin(Note $note)
+    public function togglePin(Note $note): RedirectResponse
     {
         $this->authorize('update', $note);
 
@@ -104,40 +110,43 @@ class NoteController extends Controller
     /**
      * Share a note with another user.
      */
-    public function share(Request $request, Note $note)
+    public function share(Request $request, Note $note): RedirectResponse
     {
-        $this->authorize('share', $note);
-
-        $request->validate([
-            'user_id' => 'required|exists:users,id',
-            'permission' => 'required|in:view,edit',
-        ]);
-
-        $note->sharedWith()->syncWithoutDetaching([
-            $request->user_id => ['permission' => $request->permission],
-        ]);
-
-        Notification::create([
-            'user_id' => $request->user_id,
-            'from_user_id' => auth()->id(),
-            'type' => 'note_shared',
-            'title' => 'Notiz geteilt',
-            'message' => auth()->user()->name . ' hat die Notiz "' . $note->title . '" mit dir geteilt.',
-            'data' => ['note_id' => $note->id],
-        ]);
-
-        return redirect()->back();
+        return $this->performShare($request, $note);
     }
 
     /**
      * Remove sharing of a note with a user.
      */
-    public function unshare(Request $request, Note $note)
+    public function unshare(Request $request, Note $note): RedirectResponse
     {
-        $this->authorize('share', $note);
+        return $this->performUnshare($request, $note);
+    }
 
-        $note->sharedWith()->detach($request->user_id);
+    // ── HasSharing implementation ─────────────────────
 
-        return redirect()->back();
+    protected function sharingPivotField(): string
+    {
+        return 'permission';
+    }
+
+    protected function sharingNotificationType(): string
+    {
+        return 'note_shared';
+    }
+
+    protected function sharingNotificationTitle(): string
+    {
+        return 'Notiz geteilt';
+    }
+
+    protected function sharingNotificationMessage(Model $resource): string
+    {
+        return auth()->user()->name.' hat die Notiz "'.$resource->title.'" mit dir geteilt.';
+    }
+
+    protected function sharingNotificationData(Model $resource): array
+    {
+        return ['note_id' => $resource->id];
     }
 }
