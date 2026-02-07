@@ -1,10 +1,10 @@
 <?php
 
 use App\Http\Controllers\CalendarEventController;
-use App\Http\Controllers\NotificationController;
-use App\Http\Controllers\NoteController;
 use App\Http\Controllers\ListController;
 use App\Http\Controllers\ListItemController;
+use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\NoteController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 use Laravel\Fortify\Features;
@@ -20,9 +20,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
         return Inertia::render('dashboard');
     })->name('dashboard');
 
-    Route::get('/lists', function () {
-        return Inertia::render('lists/index');
-    })->name('lists.index');
+    Route::resource('lists', ListController::class)->except(['edit']);
+    Route::post('lists/{list}/share', [ListController::class, 'share'])->name('lists.share');
+    Route::delete('lists/{list}/unshare', [ListController::class, 'unshare'])->name('lists.unshare');
+    Route::post('lists/{list}/items', [ListItemController::class, 'store'])->name('lists.items.store');
+    Route::put('lists/{list}/items/{item}', [ListItemController::class, 'update'])->name('lists.items.update');
+    Route::delete('lists/{list}/items/{item}', [ListItemController::class, 'destroy'])->name('lists.items.destroy');
+    Route::post('lists/{list}/items/reorder', [ListItemController::class, 'reorder'])->name('lists.items.reorder');
 
     Route::get('calendar', [CalendarEventController::class, 'index'])->name('calendar.index');
     Route::post('calendar/events', [CalendarEventController::class, 'store'])->name('calendar.events.store');
@@ -40,9 +44,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::patch('notifications/{notification}/read', [NotificationController::class, 'markAsRead'])->name('notifications.read');
     Route::post('notifications/read-all', [NotificationController::class, 'markAllAsRead'])->name('notifications.readAll');
     Route::get('notifications/unread-count', [NotificationController::class, 'unreadCount'])->name('notifications.unreadCount');
-});
-
-require __DIR__.'/settings.php';
 });
 
 require __DIR__.'/settings.php';
