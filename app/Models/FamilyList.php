@@ -48,7 +48,7 @@ class FamilyList extends Model
      */
     public function sharedWith(): BelongsToMany
     {
-        return $this->belongsToMany(User::class, 'list_user')
+        return $this->belongsToMany(User::class, 'list_user', 'list_id', 'user_id')
             ->withPivot('permission')
             ->withTimestamps();
     }

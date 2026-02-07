@@ -67,7 +67,7 @@ class User extends Authenticatable
      */
     public function sharedLists(): BelongsToMany
     {
-        return $this->belongsToMany(FamilyList::class, 'list_user')
+        return $this->belongsToMany(FamilyList::class, 'list_user', 'user_id', 'list_id')
             ->withPivot('permission')
             ->withTimestamps();
     }
