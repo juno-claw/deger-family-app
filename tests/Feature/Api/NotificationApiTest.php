@@ -14,10 +14,13 @@ class NotificationApiTest extends TestCase
 
     private User $user;
 
+    private User $aiAgent;
+
     protected function setUp(): void
     {
         parent::setUp();
         $this->user = User::factory()->create();
+        $this->aiAgent = User::factory()->create(['role' => 'ai_agent']);
         Sanctum::actingAs($this->user);
     }
 
@@ -25,11 +28,9 @@ class NotificationApiTest extends TestCase
 
     public function test_can_list_own_notifications(): void
     {
-        Notification::create([
+        Notification::factory()->create([
             'user_id' => $this->user->id,
-            'type' => 'general',
             'title' => 'Test',
-            'message' => 'Hello',
         ]);
 
         $response = $this->getJson('/api/v1/notifications');
@@ -41,13 +42,7 @@ class NotificationApiTest extends TestCase
 
     public function test_cannot_see_other_users_notifications(): void
     {
-        $other = User::factory()->create();
-        Notification::create([
-            'user_id' => $other->id,
-            'type' => 'general',
-            'title' => 'Private',
-            'message' => 'Not yours',
-        ]);
+        Notification::factory()->create(['title' => 'Private']);
 
         $response = $this->getJson('/api/v1/notifications');
 
@@ -57,14 +52,7 @@ class NotificationApiTest extends TestCase
 
     public function test_notifications_are_paginated(): void
     {
-        for ($i = 0; $i < 35; $i++) {
-            Notification::create([
-                'user_id' => $this->user->id,
-                'type' => 'general',
-                'title' => "Notification $i",
-                'message' => "Message $i",
-            ]);
-        }
+        Notification::factory()->count(35)->create(['user_id' => $this->user->id]);
 
         $response = $this->getJson('/api/v1/notifications');
 
@@ -76,12 +64,12 @@ class NotificationApiTest extends TestCase
 
     // ── Push ──────────────────────────────────────────
 
-    public function test_can_push_notification_to_another_user(): void
+    public function test_ai_agent_can_push_notification(): void
     {
-        $recipient = User::factory()->create();
+        Sanctum::actingAs($this->aiAgent);
 
         $response = $this->postJson('/api/v1/notifications/push', [
-            'user_id' => $recipient->id,
+            'user_id' => $this->user->id,
             'title' => 'Hello',
             'message' => 'This is a test notification',
             'type' => 'reminder',
@@ -91,21 +79,21 @@ class NotificationApiTest extends TestCase
             ->assertJsonPath('data.title', 'Hello')
             ->assertJsonPath('data.message', 'This is a test notification')
             ->assertJsonPath('data.type', 'reminder')
-            ->assertJsonPath('data.from_user.id', $this->user->id);
+            ->assertJsonPath('data.from_user.id', $this->aiAgent->id);
 
         $this->assertDatabaseHas('notifications', [
-            'user_id' => $recipient->id,
-            'from_user_id' => $this->user->id,
+            'user_id' => $this->user->id,
+            'from_user_id' => $this->aiAgent->id,
             'title' => 'Hello',
         ]);
     }
 
     public function test_push_notification_defaults_type_to_general(): void
     {
-        $recipient = User::factory()->create();
+        Sanctum::actingAs($this->aiAgent);
 
         $response = $this->postJson('/api/v1/notifications/push', [
-            'user_id' => $recipient->id,
+            'user_id' => $this->user->id,
             'title' => 'No type',
             'message' => 'Test',
         ]);
@@ -114,8 +102,21 @@ class NotificationApiTest extends TestCase
             ->assertJsonPath('data.type', 'general');
     }
 
+    public function test_non_agent_cannot_push_notification(): void
+    {
+        $response = $this->postJson('/api/v1/notifications/push', [
+            'user_id' => $this->user->id,
+            'title' => 'Hello',
+            'message' => 'Test',
+        ]);
+
+        $response->assertForbidden();
+    }
+
     public function test_cannot_push_notification_without_required_fields(): void
     {
+        Sanctum::actingAs($this->aiAgent);
+
         $response = $this->postJson('/api/v1/notifications/push', []);
 
         $response->assertUnprocessable()
@@ -124,6 +125,8 @@ class NotificationApiTest extends TestCase
 
     public function test_cannot_push_notification_to_nonexistent_user(): void
     {
+        Sanctum::actingAs($this->aiAgent);
+
         $response = $this->postJson('/api/v1/notifications/push', [
             'user_id' => 9999,
             'title' => 'Fail',
@@ -138,12 +141,7 @@ class NotificationApiTest extends TestCase
 
     public function test_can_mark_notification_as_read(): void
     {
-        $notification = Notification::create([
-            'user_id' => $this->user->id,
-            'type' => 'general',
-            'title' => 'Unread',
-            'message' => 'Mark me',
-        ]);
+        $notification = Notification::factory()->create(['user_id' => $this->user->id]);
 
         $response = $this->patchJson("/api/v1/notifications/{$notification->id}/read");
 
@@ -154,12 +152,7 @@ class NotificationApiTest extends TestCase
     public function test_cannot_mark_other_users_notification_as_read(): void
     {
         $other = User::factory()->create();
-        $notification = Notification::create([
-            'user_id' => $other->id,
-            'type' => 'general',
-            'title' => 'Not Yours',
-            'message' => 'Stay away',
-        ]);
+        $notification = Notification::factory()->create(['user_id' => $other->id]);
 
         $response = $this->patchJson("/api/v1/notifications/{$notification->id}/read");
 
@@ -170,14 +163,7 @@ class NotificationApiTest extends TestCase
 
     public function test_can_mark_all_notifications_as_read(): void
     {
-        for ($i = 0; $i < 5; $i++) {
-            Notification::create([
-                'user_id' => $this->user->id,
-                'type' => 'general',
-                'title' => "Note $i",
-                'message' => "Message $i",
-            ]);
-        }
+        Notification::factory()->count(5)->create(['user_id' => $this->user->id]);
 
         $response = $this->postJson('/api/v1/notifications/read-all');
 
@@ -188,12 +174,7 @@ class NotificationApiTest extends TestCase
     public function test_mark_all_as_read_does_not_affect_other_users(): void
     {
         $other = User::factory()->create();
-        Notification::create([
-            'user_id' => $other->id,
-            'type' => 'general',
-            'title' => 'Other',
-            'message' => 'Not mine',
-        ]);
+        Notification::factory()->create(['user_id' => $other->id]);
 
         $this->postJson('/api/v1/notifications/read-all');
 
