@@ -2,6 +2,8 @@ import { AppContent } from '@/components/app-content';
 import { AppShell } from '@/components/app-shell';
 import { AppSidebar } from '@/components/app-sidebar';
 import { AppSidebarHeader } from '@/components/app-sidebar-header';
+import { MobileBottomNav } from '@/components/mobile-bottom-nav';
+import { NotificationBell } from '@/components/notification-bell';
 import type { AppLayoutProps } from '@/types';
 
 export default function AppSidebarLayout({
@@ -12,9 +14,15 @@ export default function AppSidebarLayout({
         <AppShell variant="sidebar">
             <AppSidebar />
             <AppContent variant="sidebar" className="overflow-x-hidden">
-                <AppSidebarHeader breadcrumbs={breadcrumbs} />
-                {children}
+                <AppSidebarHeader
+                    breadcrumbs={breadcrumbs}
+                    right={<NotificationBell unreadCount={0} />}
+                />
+                <div className="pb-20 md:pb-0">
+                    {children}
+                </div>
             </AppContent>
+            <MobileBottomNav />
         </AppShell>
     );
 }

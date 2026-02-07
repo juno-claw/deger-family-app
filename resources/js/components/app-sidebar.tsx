@@ -1,5 +1,5 @@
 import { Link } from '@inertiajs/react';
-import { BookOpen, Folder, LayoutGrid } from 'lucide-react';
+import { Bell, CalendarDays, LayoutGrid, ListTodo, StickyNote } from 'lucide-react';
 import { NavFooter } from '@/components/nav-footer';
 import { NavMain } from '@/components/nav-main';
 import { NavUser } from '@/components/nav-user';
@@ -22,18 +22,28 @@ const mainNavItems: NavItem[] = [
         href: dashboard(),
         icon: LayoutGrid,
     },
+    {
+        title: 'Listen',
+        href: '/lists',
+        icon: ListTodo,
+    },
+    {
+        title: 'Kalender',
+        href: '/calendar',
+        icon: CalendarDays,
+    },
+    {
+        title: 'Notizen',
+        href: '/notes',
+        icon: StickyNote,
+    },
 ];
 
 const footerNavItems: NavItem[] = [
     {
-        title: 'Repository',
-        href: 'https://github.com/laravel/react-starter-kit',
-        icon: Folder,
-    },
-    {
-        title: 'Documentation',
-        href: 'https://laravel.com/docs/starter-kits#react',
-        icon: BookOpen,
+        title: 'Benachrichtigungen',
+        href: '/notifications',
+        icon: Bell,
     },
 ];
 
