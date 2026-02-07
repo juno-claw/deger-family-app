@@ -21,7 +21,7 @@ class NotePolicy
     public function view(User $user, Note $note): bool
     {
         return $note->owner_id === $user->id
-            || $note->sharedWith->contains($user);
+            || $note->sharedWith()->where('users.id', $user->id)->exists();
     }
 
     /**
@@ -41,9 +41,10 @@ class NotePolicy
             return true;
         }
 
-        $sharedUser = $note->sharedWith->firstWhere('id', $user->id);
-
-        return $sharedUser && $sharedUser->pivot->permission === 'edit';
+        return $note->sharedWith()
+            ->where('users.id', $user->id)
+            ->wherePivot('permission', 'edit')
+            ->exists();
     }
 
     /**

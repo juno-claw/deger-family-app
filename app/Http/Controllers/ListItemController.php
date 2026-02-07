@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Requests\StoreListItemRequest;
 use App\Models\FamilyList;
 use App\Models\ListItem;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 
 class ListItemController extends Controller
@@ -12,14 +13,16 @@ class ListItemController extends Controller
     /**
      * Store a newly created list item.
      */
-    public function store(StoreListItemRequest $request, FamilyList $list)
+    public function store(StoreListItemRequest $request, FamilyList $list): RedirectResponse
     {
         $this->authorize('update', $list);
+
+        $maxPosition = $list->items()->lockForUpdate()->max('position') ?? -1;
 
         ListItem::create([
             'list_id' => $list->id,
             'content' => $request->validated('content'),
-            'position' => $list->items()->max('position') + 1,
+            'position' => $maxPosition + 1,
             'created_by' => auth()->id(),
         ]);
 
@@ -29,7 +32,7 @@ class ListItemController extends Controller
     /**
      * Update the specified list item.
      */
-    public function update(Request $request, FamilyList $list, ListItem $item)
+    public function update(Request $request, FamilyList $list, ListItem $item): RedirectResponse
     {
         $this->authorize('update', $list);
 
@@ -46,7 +49,7 @@ class ListItemController extends Controller
     /**
      * Remove the specified list item.
      */
-    public function destroy(FamilyList $list, ListItem $item)
+    public function destroy(FamilyList $list, ListItem $item): RedirectResponse
     {
         $this->authorize('update', $list);
 
@@ -58,7 +61,7 @@ class ListItemController extends Controller
     /**
      * Reorder list items.
      */
-    public function reorder(Request $request, FamilyList $list)
+    public function reorder(Request $request, FamilyList $list): RedirectResponse
     {
         $this->authorize('update', $list);
 

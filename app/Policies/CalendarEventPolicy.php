@@ -21,7 +21,7 @@ class CalendarEventPolicy
     public function view(User $user, CalendarEvent $event): bool
     {
         return $user->id === $event->owner_id
-            || $event->sharedWith->contains('id', $user->id);
+            || $event->sharedWith()->where('users.id', $user->id)->exists();
     }
 
     /**
@@ -38,10 +38,10 @@ class CalendarEventPolicy
     public function update(User $user, CalendarEvent $event): bool
     {
         return $user->id === $event->owner_id
-            || $event->sharedWith
-                ->where('id', $user->id)
-                ->where('pivot.status', 'accepted')
-                ->isNotEmpty();
+            || $event->sharedWith()
+                ->where('users.id', $user->id)
+                ->wherePivot('status', 'accepted')
+                ->exists();
     }
 
     /**
