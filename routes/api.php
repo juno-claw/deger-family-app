@@ -18,7 +18,9 @@ Route::prefix('v1/shortcuts')->middleware(EnsureLocalhost::class)->group(functio
     Route::get('todo', [ShortcutApiController::class, 'todo'])->name('shortcuts.todo');
     Route::get('kalender', [ShortcutApiController::class, 'kalender'])->name('shortcuts.kalender');
     Route::get('notizen', [ShortcutApiController::class, 'notizen'])->name('shortcuts.notizen');
+    Route::get('notiz/{id}', [ShortcutApiController::class, 'notiz'])->name('shortcuts.notiz');
     Route::get('rezepte', [ShortcutApiController::class, 'rezepte'])->name('shortcuts.rezepte');
+    Route::get('rezept/{id}', [ShortcutApiController::class, 'rezept'])->name('shortcuts.rezept');
 });
 
 Route::prefix('v1')->middleware('auth:sanctum')->name('api.')->group(function () {

@@ -378,7 +378,9 @@ Beispiel: `?user=olli` → sucht User mit `olli@deger.family`
 | `GET /api/v1/shortcuts/todo?user=olli` | Zuletzt aktualisierte Todo-Liste (Typ `todo`) |
 | `GET /api/v1/shortcuts/kalender?user=olli` | Termine der naechsten 7 Tage |
 | `GET /api/v1/shortcuts/notizen?user=olli` | Alle Notizen (gepinnte zuerst) |
+| `GET /api/v1/shortcuts/notiz/{id}?user=olli` | Einzelne Notiz im Detail |
 | `GET /api/v1/shortcuts/rezepte?user=olli` | Alle Rezepte (Favoriten zuerst) |
+| `GET /api/v1/shortcuts/rezept/{id}?user=olli` | Einzelnes Rezept im Detail |
 
 ### Response-Format
 
@@ -389,6 +391,76 @@ Alle Endpoints geben ein einfaches JSON mit einem `text`-Feld zurueck:
   "text": "🛒 Wocheneinkauf\n\n◻️ Milch\n◻️ Brot\n✅ Butter (erledigt)\n\n📊 1 von 3 erledigt"
 }
 ```
+
+### Inline-Buttons (format=buttons)
+
+Die Endpoints `/notizen` und `/rezepte` unterstuetzen den Query-Parameter `format=buttons`. Damit wird statt des Plain-Text-Formats ein JSON mit `text` und `items`-Array zurueckgegeben, das fuer Telegram Inline-Buttons geeignet ist.
+
+**Notizen mit Buttons:** `GET /api/v1/shortcuts/notizen?user=olli&format=buttons`
+
+```json
+{
+  "text": "📝 Notizen",
+  "items": [
+    {"id": 1, "label": "📌 Wichtige Notiz"},
+    {"id": 2, "label": "📝 Normale Notiz"}
+  ]
+}
+```
+
+- Gepinnte Notizen zuerst (📌), dann normale (📝)
+- Ohne `format=buttons`: Verhalten wie bisher (nur `text`-Feld)
+
+**Rezepte mit Buttons:** `GET /api/v1/shortcuts/rezepte?user=olli&format=buttons`
+
+```json
+{
+  "text": "👨‍🍳 Rezepte",
+  "items": [
+    {"id": 1, "label": "⭐ Spaghetti Bolognese"},
+    {"id": 2, "label": "📖 Pfannkuchen"}
+  ]
+}
+```
+
+- Favoriten zuerst (⭐), dann normale (📖)
+- Ohne `format=buttons`: Verhalten wie bisher (nur `text`-Feld)
+
+### Detail-Endpoints
+
+Die Detail-Endpoints werden typischerweise aufgerufen, wenn ein User auf einen Inline-Button klickt. Die Callback-Data der Buttons enthaelt `/notiz {id}` bzw. `/rezept {id}`.
+
+**Notiz-Detail:** `GET /api/v1/shortcuts/notiz/{id}?user=olli`
+
+```json
+{
+  "text": "📝 Wichtig\n\nHier steht der vollstaendige Inhalt der Notiz."
+}
+```
+
+**Rezept-Detail:** `GET /api/v1/shortcuts/rezept/{id}?user=olli`
+
+```json
+{
+  "text": "👨‍🍳 Spaghetti Bolognese\n\n⏱ 45 Min. (15 Vorbereitung + 30 Kochen)\n🍽 4 Portionen\n\n📋 Zutaten:\n• 500g Spaghetti\n• 400g Hackfleisch\n• 1 Dose Tomaten\n\n👩‍🍳 Zubereitung:\n1. Wasser kochen\n2. Spaghetti kochen\n3. Soße zubereiten"
+}
+```
+
+**Fehlerfaelle Detail-Endpoints:**
+- `404` mit `{"text": "⚠️ Notiz nicht gefunden."}` wenn Notiz nicht existiert oder User keinen Zugriff hat
+- `404` mit `{"text": "⚠️ Rezept nicht gefunden."}` wenn Rezept nicht existiert oder User keinen Zugriff hat
+
+### Flow: Buttons → Detail
+
+```
+1. Juno ruft /notizen mit format=buttons auf
+2. Juno sendet Telegram-Nachricht mit Inline-Buttons (aus items-Array)
+3. User klickt Button → Callback-Data: "/notiz {id}"
+4. Juno ruft /notiz/{id} auf
+5. Juno sendet den Detail-Text als Antwort
+```
+
+Gleiches gilt fuer `/rezepte` → `/rezept/{id}`.
 
 ### Datenzugriff
 

@@ -99,7 +99,7 @@ class ShortcutApiController extends Controller
     }
 
     /**
-     * GET /api/v1/shortcuts/notizen?user=
+     * GET /api/v1/shortcuts/notizen?user=&format=
      */
     public function notizen(Request $request): JsonResponse
     {
@@ -112,6 +112,18 @@ class ShortcutApiController extends Controller
 
         if ($notes->isEmpty()) {
             return response()->json(['text' => '📝 Keine Notizen vorhanden.']);
+        }
+
+        if ($request->query('format') === 'buttons') {
+            $items = $notes->map(fn (Note $note) => [
+                'id' => $note->id,
+                'label' => ($note->is_pinned ? '📌' : '📝').' '.$note->title,
+            ])->values()->all();
+
+            return response()->json([
+                'text' => '📝 Notizen',
+                'items' => $items,
+            ]);
         }
 
         $lines = ['📝 Notizen', ''];
@@ -128,7 +140,30 @@ class ShortcutApiController extends Controller
     }
 
     /**
-     * GET /api/v1/shortcuts/rezepte?user=
+     * GET /api/v1/shortcuts/notiz/{id}?user=
+     */
+    public function notiz(Request $request, int $id): JsonResponse
+    {
+        $user = $this->resolveUser($request);
+
+        $note = Note::accessibleBy($user)->find($id);
+
+        if (! $note) {
+            return response()->json(['text' => '⚠️ Notiz nicht gefunden.'], 404);
+        }
+
+        $lines = ['📝 '.$note->title];
+
+        if ($note->content) {
+            $lines[] = '';
+            $lines[] = $note->content;
+        }
+
+        return response()->json(['text' => implode("\n", $lines)]);
+    }
+
+    /**
+     * GET /api/v1/shortcuts/rezepte?user=&format=
      */
     public function rezepte(Request $request): JsonResponse
     {
@@ -141,6 +176,18 @@ class ShortcutApiController extends Controller
 
         if ($recipes->isEmpty()) {
             return response()->json(['text' => '👨‍🍳 Keine Rezepte vorhanden.']);
+        }
+
+        if ($request->query('format') === 'buttons') {
+            $items = $recipes->map(fn (Recipe $recipe) => [
+                'id' => $recipe->id,
+                'label' => ($recipe->is_favorite ? '⭐' : '📖').' '.$recipe->title,
+            ])->values()->all();
+
+            return response()->json([
+                'text' => '👨‍🍳 Rezepte',
+                'items' => $items,
+            ]);
         }
 
         $lines = ['👨‍🍳 Rezepte', ''];
@@ -157,6 +204,82 @@ class ShortcutApiController extends Controller
         $lines[] = $recipes->count().' '.($recipes->count() === 1 ? 'Rezept' : 'Rezepte').' gesamt';
 
         return response()->json(['text' => implode("\n", $lines)]);
+    }
+
+    /**
+     * GET /api/v1/shortcuts/rezept/{id}?user=
+     */
+    public function rezept(Request $request, int $id): JsonResponse
+    {
+        $user = $this->resolveUser($request);
+
+        $recipe = Recipe::accessibleBy($user)->find($id);
+
+        if (! $recipe) {
+            return response()->json(['text' => '⚠️ Rezept nicht gefunden.'], 404);
+        }
+
+        $lines = ['👨‍🍳 '.$recipe->title];
+
+        $timeDetails = $this->formatRecipeTime($recipe);
+        if ($timeDetails) {
+            $lines[] = '';
+            $lines[] = '⏱ '.$timeDetails;
+        }
+
+        if ($recipe->servings) {
+            $lines[] = '🍽 '.$recipe->servings.' '.($recipe->servings === 1 ? 'Portion' : 'Portionen');
+        }
+
+        if ($recipe->ingredients) {
+            $lines[] = '';
+            $lines[] = '📋 Zutaten:';
+            foreach (explode("\n", $recipe->ingredients) as $ingredient) {
+                $ingredient = trim($ingredient);
+                if ($ingredient !== '') {
+                    $lines[] = '• '.$ingredient;
+                }
+            }
+        }
+
+        if ($recipe->instructions) {
+            $lines[] = '';
+            $lines[] = '👩‍🍳 Zubereitung:';
+            $step = 1;
+            foreach (explode("\n", $recipe->instructions) as $instruction) {
+                $instruction = trim($instruction);
+                if ($instruction !== '') {
+                    $lines[] = $step.'. '.$instruction;
+                    $step++;
+                }
+            }
+        }
+
+        return response()->json(['text' => implode("\n", $lines)]);
+    }
+
+    /**
+     * Format recipe time as a human-readable string.
+     */
+    private function formatRecipeTime(Recipe $recipe): ?string
+    {
+        $prep = $recipe->prep_time ?? 0;
+        $cook = $recipe->cook_time ?? 0;
+        $total = $prep + $cook;
+
+        if ($total === 0) {
+            return null;
+        }
+
+        if ($prep > 0 && $cook > 0) {
+            return $total.' Min. ('.$prep.' Vorbereitung + '.$cook.' Kochen)';
+        }
+
+        if ($prep > 0) {
+            return $prep.' Min. Vorbereitung';
+        }
+
+        return $cook.' Min. Kochen';
     }
 
     /**

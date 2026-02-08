@@ -283,6 +283,141 @@ class ShortcutApiTest extends TestCase
 
     // ── Notizen ───────────────────────────────────────
 
+    public function test_notizen_with_format_buttons_returns_items_array(): void
+    {
+        Note::factory()->create([
+            'title' => 'Normale Notiz',
+            'owner_id' => $this->user->id,
+            'is_pinned' => false,
+        ]);
+        $pinned = Note::factory()->pinned()->create([
+            'title' => 'Wichtige Notiz',
+            'owner_id' => $this->user->id,
+        ]);
+
+        $response = $this->getJson('/api/v1/shortcuts/notizen?user=olli&format=buttons');
+
+        $response->assertOk()
+            ->assertJsonPath('text', '📝 Notizen')
+            ->assertJsonCount(2, 'items');
+
+        $items = $response->json('items');
+        $this->assertEquals('📌 Wichtige Notiz', $items[0]['label']);
+        $this->assertEquals($pinned->id, $items[0]['id']);
+        $this->assertEquals('📝 Normale Notiz', $items[1]['label']);
+    }
+
+    public function test_notizen_with_format_buttons_empty_state(): void
+    {
+        $response = $this->getJson('/api/v1/shortcuts/notizen?user=olli&format=buttons');
+
+        $response->assertOk()
+            ->assertJsonPath('text', '📝 Keine Notizen vorhanden.')
+            ->assertJsonMissingPath('items');
+    }
+
+    public function test_notizen_with_format_buttons_includes_shared_notes(): void
+    {
+        $otherUser = User::factory()->create();
+        $note = Note::factory()->create([
+            'title' => 'Geteilte Notiz',
+            'owner_id' => $otherUser->id,
+        ]);
+        $note->sharedWith()->attach($this->user->id, ['permission' => 'view']);
+
+        $response = $this->getJson('/api/v1/shortcuts/notizen?user=olli&format=buttons');
+
+        $response->assertOk()
+            ->assertJsonCount(1, 'items');
+        $this->assertEquals('Geteilte Notiz', str_replace('📝 ', '', $response->json('items.0.label')));
+    }
+
+    public function test_notizen_without_format_buttons_returns_plain_text(): void
+    {
+        Note::factory()->create([
+            'title' => 'Meine Notiz',
+            'owner_id' => $this->user->id,
+        ]);
+
+        $response = $this->getJson('/api/v1/shortcuts/notizen?user=olli');
+
+        $response->assertOk()
+            ->assertJsonMissingPath('items');
+        $this->assertStringContainsString('Meine Notiz', $response->json('text'));
+    }
+
+    // ── Notiz Detail ──────────────────────────────────
+
+    public function test_notiz_returns_note_detail(): void
+    {
+        $note = Note::factory()->create([
+            'title' => 'Wichtig',
+            'content' => 'Hier steht der vollständige Inhalt der Notiz.',
+            'owner_id' => $this->user->id,
+        ]);
+
+        $response = $this->getJson('/api/v1/shortcuts/notiz/'.$note->id.'?user=olli');
+
+        $response->assertOk();
+
+        $text = $response->json('text');
+        $this->assertStringContainsString('📝 Wichtig', $text);
+        $this->assertStringContainsString('Hier steht der vollständige Inhalt der Notiz.', $text);
+    }
+
+    public function test_notiz_returns_note_without_content(): void
+    {
+        $note = Note::factory()->create([
+            'title' => 'Leere Notiz',
+            'content' => null,
+            'owner_id' => $this->user->id,
+        ]);
+
+        $response = $this->getJson('/api/v1/shortcuts/notiz/'.$note->id.'?user=olli');
+
+        $response->assertOk();
+        $this->assertEquals('📝 Leere Notiz', $response->json('text'));
+    }
+
+    public function test_notiz_returns_404_for_nonexistent_note(): void
+    {
+        $response = $this->getJson('/api/v1/shortcuts/notiz/9999?user=olli');
+
+        $response->assertNotFound()
+            ->assertJsonPath('text', '⚠️ Notiz nicht gefunden.');
+    }
+
+    public function test_notiz_returns_404_for_inaccessible_note(): void
+    {
+        $otherUser = User::factory()->create();
+        $note = Note::factory()->create([
+            'title' => 'Geheime Notiz',
+            'owner_id' => $otherUser->id,
+        ]);
+
+        $response = $this->getJson('/api/v1/shortcuts/notiz/'.$note->id.'?user=olli');
+
+        $response->assertNotFound()
+            ->assertJsonPath('text', '⚠️ Notiz nicht gefunden.');
+    }
+
+    public function test_notiz_returns_shared_note_detail(): void
+    {
+        $otherUser = User::factory()->create();
+        $note = Note::factory()->create([
+            'title' => 'Geteilte Notiz',
+            'content' => 'Geteilter Inhalt',
+            'owner_id' => $otherUser->id,
+        ]);
+        $note->sharedWith()->attach($this->user->id, ['permission' => 'view']);
+
+        $response = $this->getJson('/api/v1/shortcuts/notiz/'.$note->id.'?user=olli');
+
+        $response->assertOk();
+        $this->assertStringContainsString('Geteilte Notiz', $response->json('text'));
+        $this->assertStringContainsString('Geteilter Inhalt', $response->json('text'));
+    }
+
     public function test_notizen_returns_pinned_first(): void
     {
         Note::factory()->create([
@@ -333,6 +468,211 @@ class ShortcutApiTest extends TestCase
     }
 
     // ── Rezepte ───────────────────────────────────────
+
+    public function test_rezepte_with_format_buttons_returns_items_array(): void
+    {
+        Recipe::factory()->create([
+            'title' => 'Pfannkuchen',
+            'owner_id' => $this->user->id,
+            'is_favorite' => false,
+        ]);
+        $favorite = Recipe::factory()->favorite()->create([
+            'title' => 'Spaghetti Bolognese',
+            'owner_id' => $this->user->id,
+        ]);
+
+        $response = $this->getJson('/api/v1/shortcuts/rezepte?user=olli&format=buttons');
+
+        $response->assertOk()
+            ->assertJsonPath('text', '👨‍🍳 Rezepte')
+            ->assertJsonCount(2, 'items');
+
+        $items = $response->json('items');
+        $this->assertEquals('⭐ Spaghetti Bolognese', $items[0]['label']);
+        $this->assertEquals($favorite->id, $items[0]['id']);
+        $this->assertEquals('📖 Pfannkuchen', $items[1]['label']);
+    }
+
+    public function test_rezepte_with_format_buttons_empty_state(): void
+    {
+        $response = $this->getJson('/api/v1/shortcuts/rezepte?user=olli&format=buttons');
+
+        $response->assertOk()
+            ->assertJsonPath('text', '👨‍🍳 Keine Rezepte vorhanden.')
+            ->assertJsonMissingPath('items');
+    }
+
+    public function test_rezepte_with_format_buttons_includes_shared_recipes(): void
+    {
+        $otherUser = User::factory()->create();
+        $recipe = Recipe::factory()->create([
+            'title' => 'Geteiltes Rezept',
+            'owner_id' => $otherUser->id,
+        ]);
+        $recipe->sharedWith()->attach($this->user->id, ['permission' => 'view']);
+
+        $response = $this->getJson('/api/v1/shortcuts/rezepte?user=olli&format=buttons');
+
+        $response->assertOk()
+            ->assertJsonCount(1, 'items');
+        $this->assertStringContainsString('Geteiltes Rezept', $response->json('items.0.label'));
+    }
+
+    public function test_rezepte_without_format_buttons_returns_plain_text(): void
+    {
+        Recipe::factory()->create([
+            'title' => 'Mein Rezept',
+            'category' => 'cooking',
+            'owner_id' => $this->user->id,
+        ]);
+
+        $response = $this->getJson('/api/v1/shortcuts/rezepte?user=olli');
+
+        $response->assertOk()
+            ->assertJsonMissingPath('items');
+        $this->assertStringContainsString('Mein Rezept', $response->json('text'));
+    }
+
+    // ── Rezept Detail ─────────────────────────────────
+
+    public function test_rezept_returns_full_recipe_detail(): void
+    {
+        $recipe = Recipe::factory()->create([
+            'title' => 'Spaghetti Bolognese',
+            'prep_time' => 15,
+            'cook_time' => 30,
+            'servings' => 4,
+            'ingredients' => "500g Spaghetti\n400g Hackfleisch\n1 Dose Tomaten",
+            'instructions' => "Wasser kochen\nSpaghetti kochen\nSoße zubereiten",
+            'owner_id' => $this->user->id,
+        ]);
+
+        $response = $this->getJson('/api/v1/shortcuts/rezept/'.$recipe->id.'?user=olli');
+
+        $response->assertOk();
+
+        $text = $response->json('text');
+        $this->assertStringContainsString('👨‍🍳 Spaghetti Bolognese', $text);
+        $this->assertStringContainsString('⏱ 45 Min. (15 Vorbereitung + 30 Kochen)', $text);
+        $this->assertStringContainsString('🍽 4 Portionen', $text);
+        $this->assertStringContainsString('📋 Zutaten:', $text);
+        $this->assertStringContainsString('• 500g Spaghetti', $text);
+        $this->assertStringContainsString('• 400g Hackfleisch', $text);
+        $this->assertStringContainsString('• 1 Dose Tomaten', $text);
+        $this->assertStringContainsString('👩‍🍳 Zubereitung:', $text);
+        $this->assertStringContainsString('1. Wasser kochen', $text);
+        $this->assertStringContainsString('2. Spaghetti kochen', $text);
+        $this->assertStringContainsString('3. Soße zubereiten', $text);
+    }
+
+    public function test_rezept_handles_prep_time_only(): void
+    {
+        $recipe = Recipe::factory()->create([
+            'title' => 'Salat',
+            'prep_time' => 10,
+            'cook_time' => null,
+            'servings' => 2,
+            'ingredients' => 'Salat',
+            'instructions' => 'Waschen',
+            'owner_id' => $this->user->id,
+        ]);
+
+        $response = $this->getJson('/api/v1/shortcuts/rezept/'.$recipe->id.'?user=olli');
+
+        $text = $response->json('text');
+        $this->assertStringContainsString('⏱ 10 Min. Vorbereitung', $text);
+    }
+
+    public function test_rezept_handles_cook_time_only(): void
+    {
+        $recipe = Recipe::factory()->create([
+            'title' => 'Reis',
+            'prep_time' => null,
+            'cook_time' => 20,
+            'servings' => 2,
+            'ingredients' => 'Reis',
+            'instructions' => 'Kochen',
+            'owner_id' => $this->user->id,
+        ]);
+
+        $response = $this->getJson('/api/v1/shortcuts/rezept/'.$recipe->id.'?user=olli');
+
+        $text = $response->json('text');
+        $this->assertStringContainsString('⏱ 20 Min. Kochen', $text);
+    }
+
+    public function test_rezept_handles_no_times_and_no_servings(): void
+    {
+        $recipe = Recipe::factory()->create([
+            'title' => 'Smoothie',
+            'prep_time' => null,
+            'cook_time' => null,
+            'servings' => null,
+            'ingredients' => 'Banane',
+            'instructions' => 'Mixen',
+            'owner_id' => $this->user->id,
+        ]);
+
+        $response = $this->getJson('/api/v1/shortcuts/rezept/'.$recipe->id.'?user=olli');
+
+        $text = $response->json('text');
+        $this->assertStringNotContainsString('⏱', $text);
+        $this->assertStringNotContainsString('🍽', $text);
+    }
+
+    public function test_rezept_shows_singular_portion(): void
+    {
+        $recipe = Recipe::factory()->create([
+            'title' => 'Solo Snack',
+            'servings' => 1,
+            'owner_id' => $this->user->id,
+        ]);
+
+        $response = $this->getJson('/api/v1/shortcuts/rezept/'.$recipe->id.'?user=olli');
+
+        $this->assertStringContainsString('🍽 1 Portion', $response->json('text'));
+        $this->assertStringNotContainsString('Portionen', $response->json('text'));
+    }
+
+    public function test_rezept_returns_404_for_nonexistent_recipe(): void
+    {
+        $response = $this->getJson('/api/v1/shortcuts/rezept/9999?user=olli');
+
+        $response->assertNotFound()
+            ->assertJsonPath('text', '⚠️ Rezept nicht gefunden.');
+    }
+
+    public function test_rezept_returns_404_for_inaccessible_recipe(): void
+    {
+        $otherUser = User::factory()->create();
+        $recipe = Recipe::factory()->create([
+            'title' => 'Geheimes Rezept',
+            'owner_id' => $otherUser->id,
+        ]);
+
+        $response = $this->getJson('/api/v1/shortcuts/rezept/'.$recipe->id.'?user=olli');
+
+        $response->assertNotFound()
+            ->assertJsonPath('text', '⚠️ Rezept nicht gefunden.');
+    }
+
+    public function test_rezept_returns_shared_recipe_detail(): void
+    {
+        $otherUser = User::factory()->create();
+        $recipe = Recipe::factory()->create([
+            'title' => 'Geteiltes Rezept',
+            'ingredients' => 'Zutat A',
+            'instructions' => 'Schritt 1',
+            'owner_id' => $otherUser->id,
+        ]);
+        $recipe->sharedWith()->attach($this->user->id, ['permission' => 'view']);
+
+        $response = $this->getJson('/api/v1/shortcuts/rezept/'.$recipe->id.'?user=olli');
+
+        $response->assertOk();
+        $this->assertStringContainsString('Geteiltes Rezept', $response->json('text'));
+        $this->assertStringContainsString('• Zutat A', $response->json('text'));
+    }
 
     public function test_rezepte_returns_favorites_first(): void
     {
