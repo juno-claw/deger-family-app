@@ -7,9 +7,11 @@ use App\Models\User;
 
 class NotificationService
 {
+    public function __construct(private TelegramService $telegramService) {}
+
     public function notify(User $user, ?User $fromUser, string $type, string $title, string $message, array $data = []): Notification
     {
-        return Notification::create([
+        $notification = Notification::create([
             'user_id' => $user->id,
             'from_user_id' => $fromUser?->id,
             'type' => $type,
@@ -17,6 +19,10 @@ class NotificationService
             'message' => $message,
             'data' => $data,
         ]);
+
+        $this->telegramService->sendNotification($notification);
+
+        return $notification;
     }
 
     public function getUnreadCount(User $user): int

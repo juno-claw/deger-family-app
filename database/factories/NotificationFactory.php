@@ -35,4 +35,14 @@ class NotificationFactory extends Factory
             'read_at' => now(),
         ]);
     }
+
+    /**
+     * Mark the notification as sent via Telegram.
+     */
+    public function telegramSent(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'telegram_sent_at' => now(),
+        ]);
+    }
 }

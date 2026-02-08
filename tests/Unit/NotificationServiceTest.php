@@ -5,7 +5,9 @@ namespace Tests\Unit;
 use App\Models\Notification;
 use App\Models\User;
 use App\Services\NotificationService;
+use App\Services\TelegramService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Mockery;
 use Tests\TestCase;
 
 class NotificationServiceTest extends TestCase
@@ -14,10 +16,14 @@ class NotificationServiceTest extends TestCase
 
     private NotificationService $service;
 
+    private TelegramService|Mockery\MockInterface $telegramMock;
+
     protected function setUp(): void
     {
         parent::setUp();
-        $this->service = new NotificationService;
+        $this->telegramMock = Mockery::mock(TelegramService::class);
+        $this->telegramMock->shouldReceive('sendNotification')->byDefault();
+        $this->service = new NotificationService($this->telegramMock);
     }
 
     public function test_notify_creates_notification(): void
@@ -58,6 +64,24 @@ class NotificationServiceTest extends TestCase
         );
 
         $this->assertNull($notification->from_user_id);
+    }
+
+    public function test_notify_triggers_telegram_push(): void
+    {
+        $this->telegramMock
+            ->shouldReceive('sendNotification')
+            ->once()
+            ->with(Mockery::type(Notification::class));
+
+        $user = User::factory()->create();
+
+        $this->service->notify(
+            $user,
+            null,
+            'general',
+            'Test',
+            'Test message'
+        );
     }
 
     public function test_get_unread_count(): void

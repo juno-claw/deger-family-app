@@ -25,6 +25,7 @@ class Notification extends Model
         'message',
         'data',
         'read_at',
+        'telegram_sent_at',
     ];
 
     /**
@@ -37,6 +38,7 @@ class Notification extends Model
         return [
             'data' => 'array',
             'read_at' => 'datetime',
+            'telegram_sent_at' => 'datetime',
         ];
     }
 

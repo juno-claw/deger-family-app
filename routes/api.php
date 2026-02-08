@@ -7,8 +7,19 @@ use App\Http\Controllers\Api\ListItemApiController;
 use App\Http\Controllers\Api\NoteApiController;
 use App\Http\Controllers\Api\NotificationApiController;
 use App\Http\Controllers\Api\RecipeApiController;
+use App\Http\Controllers\Api\ShortcutApiController;
 use App\Http\Controllers\Api\UserApiController;
+use App\Http\Middleware\EnsureLocalhost;
 use Illuminate\Support\Facades\Route;
+
+// Telegram Shortcuts (localhost only, no auth)
+Route::prefix('v1/shortcuts')->middleware(EnsureLocalhost::class)->group(function () {
+    Route::get('einkauf', [ShortcutApiController::class, 'einkauf'])->name('shortcuts.einkauf');
+    Route::get('todo', [ShortcutApiController::class, 'todo'])->name('shortcuts.todo');
+    Route::get('kalender', [ShortcutApiController::class, 'kalender'])->name('shortcuts.kalender');
+    Route::get('notizen', [ShortcutApiController::class, 'notizen'])->name('shortcuts.notizen');
+    Route::get('rezepte', [ShortcutApiController::class, 'rezepte'])->name('shortcuts.rezepte');
+});
 
 Route::prefix('v1')->middleware('auth:sanctum')->name('api.')->group(function () {
     // Users

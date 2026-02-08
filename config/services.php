@@ -35,4 +35,17 @@ return [
         ],
     ],
 
+    'telegram' => [
+        'users' => [
+            1 => [ // Olli
+                'bot_token' => env('TELEGRAM_OLLI_BOT_TOKEN'),
+                'chat_id' => env('TELEGRAM_OLLI_CHAT_ID'),
+            ],
+            2 => [ // Sabsy
+                'bot_token' => env('TELEGRAM_SABSY_BOT_TOKEN'),
+                'chat_id' => env('TELEGRAM_SABSY_CHAT_ID'),
+            ],
+        ],
+    ],
+
 ];

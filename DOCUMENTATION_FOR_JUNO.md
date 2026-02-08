@@ -360,7 +360,53 @@ Diese Agent-Tools sind in der Umgebung verfuegbar und sollten bevorzugt genutzt 
 - `cursor-ide-browser`:
   - Browser-Automation fuer UI-Tests (navigate, snapshot, click, etc.).
 
-## 12) Kurzbeispiele (Minimal)
+## 12) Telegram Shortcuts (Localhost-Only)
+
+Die Shortcuts API liefert vorformatierten Text fuer Telegram-Slash-Commands. Diese Endpoints benoetigen **keinen Bearer Token**, sind aber **nur von localhost** (`127.0.0.1` / `::1`) erreichbar.
+
+### User-Parameter
+
+Jeder Shortcut-Endpoint erwartet einen `?user=` Query-Parameter. Der Wert wird zu `{user}@deger.family` aufgeloest (case-insensitive).
+
+Beispiel: `?user=olli` → sucht User mit `olli@deger.family`
+
+### Endpoints
+
+| Endpoint | Beschreibung |
+|---|---|
+| `GET /api/v1/shortcuts/einkauf?user=olli` | Zuletzt aktualisierte Einkaufsliste (Typ `shopping`) |
+| `GET /api/v1/shortcuts/todo?user=olli` | Zuletzt aktualisierte Todo-Liste (Typ `todo`) |
+| `GET /api/v1/shortcuts/kalender?user=olli` | Termine der naechsten 7 Tage |
+| `GET /api/v1/shortcuts/notizen?user=olli` | Alle Notizen (gepinnte zuerst) |
+| `GET /api/v1/shortcuts/rezepte?user=olli` | Alle Rezepte (Favoriten zuerst) |
+
+### Response-Format
+
+Alle Endpoints geben ein einfaches JSON mit einem `text`-Feld zurueck:
+
+```json
+{
+  "text": "🛒 Wocheneinkauf\n\n◻️ Milch\n◻️ Brot\n✅ Butter (erledigt)\n\n📊 1 von 3 erledigt"
+}
+```
+
+### Datenzugriff
+
+Jeder Endpoint zeigt Daten an, die der aufgeloeste User **besitzt oder die mit ihm geteilt** wurden (via `accessibleBy`-Scope).
+
+### Fehlerfaelle
+
+- `400` — Parameter `?user=` fehlt oder User nicht gefunden.
+- `403` — Request kommt nicht von localhost.
+
+### curl-Beispiel
+
+```bash
+curl -s http://localhost/api/v1/shortcuts/einkauf?user=olli \
+  -H "Accept: application/json" | jq -r '.text'
+```
+
+## 13) Kurzbeispiele (Minimal - Authenticated API)
 
 **Listen lesen**
 ```

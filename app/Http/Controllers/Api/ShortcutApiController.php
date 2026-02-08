@@ -1,0 +1,239 @@
+<?php
+
+namespace App\Http\Controllers\Api;
+
+use App\Http\Controllers\Controller;
+use App\Models\CalendarEvent;
+use App\Models\FamilyList;
+use App\Models\Note;
+use App\Models\Recipe;
+use App\Models\User;
+use Carbon\Carbon;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+
+class ShortcutApiController extends Controller
+{
+    /** @var array<string, string> */
+    private const CATEGORY_MAP = [
+        'cooking' => 'Kochen',
+        'baking' => 'Backen',
+        'dessert' => 'Dessert',
+        'snack' => 'Snack',
+        'drink' => 'Getränk',
+    ];
+
+    /** @var array<int, string> */
+    private const GERMAN_DAYS = [
+        0 => 'So',
+        1 => 'Mo',
+        2 => 'Di',
+        3 => 'Mi',
+        4 => 'Do',
+        5 => 'Fr',
+        6 => 'Sa',
+    ];
+
+    /**
+     * GET /api/v1/shortcuts/einkauf?user=
+     */
+    public function einkauf(Request $request): JsonResponse
+    {
+        $user = $this->resolveUser($request);
+
+        return $this->formatList($user, 'shopping', '🛒', 'Einkaufsliste');
+    }
+
+    /**
+     * GET /api/v1/shortcuts/todo?user=
+     */
+    public function todo(Request $request): JsonResponse
+    {
+        $user = $this->resolveUser($request);
+
+        return $this->formatList($user, 'todo', '📋', 'Todo-Liste');
+    }
+
+    /**
+     * GET /api/v1/shortcuts/kalender?user=
+     */
+    public function kalender(Request $request): JsonResponse
+    {
+        $user = $this->resolveUser($request);
+
+        $today = Carbon::today();
+        $endOfWeek = Carbon::today()->addDays(7)->endOfDay();
+
+        $events = CalendarEvent::accessibleBy($user)
+            ->whereBetween('start_at', [$today, $endOfWeek])
+            ->orderBy('start_at')
+            ->get();
+
+        if ($events->isEmpty()) {
+            return response()->json(['text' => '📅 Keine Termine in den nächsten 7 Tagen.']);
+        }
+
+        $lines = ['📅 Termine (nächste 7 Tage)'];
+
+        $grouped = $events->groupBy(fn (CalendarEvent $event) => $event->start_at->toDateString());
+
+        foreach ($grouped as $dateString => $dayEvents) {
+            $date = Carbon::parse($dateString);
+            $lines[] = '';
+            $lines[] = $this->formatDayLabel($date).':';
+
+            foreach ($dayEvents as $event) {
+                if ($event->all_day) {
+                    $lines[] = '  📌 Ganztägig: '.$event->title;
+                } else {
+                    $timeStr = $event->start_at->format('H:i');
+                    if ($event->end_at) {
+                        $timeStr .= '–'.$event->end_at->format('H:i');
+                    }
+                    $lines[] = '  🕐 '.$timeStr.' '.$event->title;
+                }
+            }
+        }
+
+        return response()->json(['text' => implode("\n", $lines)]);
+    }
+
+    /**
+     * GET /api/v1/shortcuts/notizen?user=
+     */
+    public function notizen(Request $request): JsonResponse
+    {
+        $user = $this->resolveUser($request);
+
+        $notes = Note::accessibleBy($user)
+            ->orderByDesc('is_pinned')
+            ->orderByDesc('updated_at')
+            ->get();
+
+        if ($notes->isEmpty()) {
+            return response()->json(['text' => '📝 Keine Notizen vorhanden.']);
+        }
+
+        $lines = ['📝 Notizen', ''];
+
+        foreach ($notes as $note) {
+            $icon = $note->is_pinned ? '📌' : '📝';
+            $lines[] = $icon.' '.$note->title;
+        }
+
+        $lines[] = '';
+        $lines[] = $notes->count().' '.($notes->count() === 1 ? 'Notiz' : 'Notizen').' gesamt';
+
+        return response()->json(['text' => implode("\n", $lines)]);
+    }
+
+    /**
+     * GET /api/v1/shortcuts/rezepte?user=
+     */
+    public function rezepte(Request $request): JsonResponse
+    {
+        $user = $this->resolveUser($request);
+
+        $recipes = Recipe::accessibleBy($user)
+            ->orderByDesc('is_favorite')
+            ->orderBy('title')
+            ->get();
+
+        if ($recipes->isEmpty()) {
+            return response()->json(['text' => '👨‍🍳 Keine Rezepte vorhanden.']);
+        }
+
+        $lines = ['👨‍🍳 Rezepte', ''];
+
+        foreach ($recipes as $recipe) {
+            $icon = $recipe->is_favorite ? '⭐' : '📖';
+            $category = self::CATEGORY_MAP[$recipe->category] ?? $recipe->category;
+            $totalTime = ($recipe->prep_time ?? 0) + ($recipe->cook_time ?? 0);
+            $timeStr = $totalTime > 0 ? ', '.$totalTime.' Min.' : '';
+            $lines[] = $icon.' '.$recipe->title.' ('.$category.$timeStr.')';
+        }
+
+        $lines[] = '';
+        $lines[] = $recipes->count().' '.($recipes->count() === 1 ? 'Rezept' : 'Rezepte').' gesamt';
+
+        return response()->json(['text' => implode("\n", $lines)]);
+    }
+
+    /**
+     * Resolve user from ?user= query parameter.
+     * Builds email as {user}@deger.family and looks it up.
+     */
+    private function resolveUser(Request $request): User
+    {
+        $username = $request->query('user');
+
+        if (! $username || ! is_string($username)) {
+            abort(400, 'Parameter "user" ist erforderlich.');
+        }
+
+        $email = strtolower($username).'@deger.family';
+
+        $user = User::where('email', $email)->first();
+
+        if (! $user) {
+            abort(400, 'Benutzer "'.$username.'" nicht gefunden.');
+        }
+
+        return $user;
+    }
+
+    /**
+     * Format a list (shopping or todo) for a given user.
+     */
+    private function formatList(User $user, string $type, string $emoji, string $fallbackName): JsonResponse
+    {
+        $list = FamilyList::accessibleBy($user)
+            ->where('type', $type)
+            ->latest('updated_at')
+            ->with('items')
+            ->first();
+
+        if (! $list) {
+            return response()->json(['text' => 'Keine '.$fallbackName.' vorhanden.']);
+        }
+
+        $items = $list->items->sortBy('is_completed');
+        $total = $items->count();
+        $completed = $items->where('is_completed', true)->count();
+
+        $lines = [$emoji.' '.$list->title, ''];
+
+        foreach ($items as $item) {
+            if ($item->is_completed) {
+                $lines[] = '✅ '.$item->content.' (erledigt)';
+            } else {
+                $lines[] = '◻️ '.$item->content;
+            }
+        }
+
+        $lines[] = '';
+        $lines[] = '📊 '.$completed.' von '.$total.' erledigt';
+
+        return response()->json(['text' => implode("\n", $lines)]);
+    }
+
+    /**
+     * Format a date as a German day label (Heute, Morgen, or weekday + date).
+     */
+    private function formatDayLabel(Carbon $date): string
+    {
+        $today = Carbon::today();
+
+        if ($date->isSameDay($today)) {
+            return 'Heute, '.$date->format('d.m.');
+        }
+
+        if ($date->isSameDay($today->copy()->addDay())) {
+            return 'Morgen, '.$date->format('d.m.');
+        }
+
+        $dayName = self::GERMAN_DAYS[$date->dayOfWeek];
+
+        return $dayName.', '.$date->format('d.m.');
+    }
+}
