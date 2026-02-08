@@ -7,13 +7,17 @@ use App\Http\Requests\StoreCalendarEventRequest;
 use App\Http\Requests\UpdateCalendarEventRequest;
 use App\Http\Resources\CalendarEventResource;
 use App\Models\CalendarEvent;
+use App\Traits\HasApiSharing;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Response;
 
 class CalendarEventApiController extends Controller
 {
+    use HasApiSharing;
+
     /**
      * Display a listing of calendar events, filtered by date range or month/year.
      */
@@ -97,5 +101,63 @@ class CalendarEventApiController extends Controller
         $event->delete();
 
         return response()->noContent();
+    }
+
+    /**
+     * Share the calendar event with another user.
+     */
+    public function share(Request $request, CalendarEvent $event): CalendarEventResource
+    {
+        return $this->performApiShare($request, $event);
+    }
+
+    /**
+     * Remove sharing of the calendar event from a user.
+     */
+    public function unshare(Request $request, CalendarEvent $event): CalendarEventResource
+    {
+        return $this->performApiUnshare($request, $event);
+    }
+
+    // ── HasApiSharing implementation ─────────────────────
+
+    protected function sharingPivotField(): string
+    {
+        return 'status';
+    }
+
+    protected function sharingRequiresPermission(): bool
+    {
+        return false;
+    }
+
+    protected function sharingDefaultPermission(): string
+    {
+        return 'pending';
+    }
+
+    protected function sharingNotificationType(): string
+    {
+        return 'event_shared';
+    }
+
+    protected function sharingNotificationTitle(): string
+    {
+        return 'Kalender-Einladung';
+    }
+
+    protected function sharingNotificationMessage(Model $resource): string
+    {
+        return auth()->user()->name.' hat dich zu "'.$resource->title.'" eingeladen.';
+    }
+
+    protected function sharingNotificationData(Model $resource): array
+    {
+        return ['event_id' => $resource->id];
+    }
+
+    protected function sharingResource(Model $resource): CalendarEventResource
+    {
+        return new CalendarEventResource($resource);
     }
 }

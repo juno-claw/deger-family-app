@@ -29,5 +29,6 @@ yarn-error.log
 /.zed
 /.agents
 /boost.json
+/storage/app/google/
 AGENTS.md
 AGENTIC_AI_DOCUMENTATION.md

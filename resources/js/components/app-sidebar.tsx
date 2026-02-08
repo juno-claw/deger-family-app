@@ -1,5 +1,5 @@
 import { Link } from '@inertiajs/react';
-import { Bell, CalendarDays, LayoutGrid, ListTodo, StickyNote } from 'lucide-react';
+import { Bell, CalendarDays, ChefHat, LayoutGrid, ListTodo, StickyNote } from 'lucide-react';
 import { NavFooter } from '@/components/nav-footer';
 import { NavMain } from '@/components/nav-main';
 import { NavUser } from '@/components/nav-user';
@@ -36,6 +36,11 @@ const mainNavItems: NavItem[] = [
         title: 'Notizen',
         href: '/notes',
         icon: StickyNote,
+    },
+    {
+        title: 'Rezepte',
+        href: '/recipes',
+        icon: ChefHat,
     },
 ];
 

@@ -1,5 +1,5 @@
 import { Head, Link } from '@inertiajs/react';
-import { Bell, CalendarDays, ListTodo, StickyNote } from 'lucide-react';
+import { Bell, CalendarDays, ChefHat, ListTodo, StickyNote } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import AppLayout from '@/layouts/app-layout';
 import type { BreadcrumbItem } from '@/types';
@@ -29,6 +29,12 @@ const quickLinks = [
         description: 'Notizen erstellen und teilen',
         href: '/notes',
         icon: StickyNote,
+    },
+    {
+        title: 'Rezepte',
+        description: 'Rezepte sammeln und teilen',
+        href: '/recipes',
+        icon: ChefHat,
     },
     {
         title: 'Benachrichtigungen',

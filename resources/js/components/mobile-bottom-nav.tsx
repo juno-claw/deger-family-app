@@ -1,5 +1,5 @@
 import { Link } from '@inertiajs/react';
-import { CalendarDays, LayoutGrid, ListTodo, StickyNote } from 'lucide-react';
+import { CalendarDays, ChefHat, LayoutGrid, ListTodo, StickyNote } from 'lucide-react';
 import { useCurrentUrl } from '@/hooks/use-current-url';
 import { cn } from '@/lib/utils';
 
@@ -24,6 +24,11 @@ const navItems = [
         href: '/notes',
         icon: StickyNote,
     },
+    {
+        title: 'Rezepte',
+        href: '/recipes',
+        icon: ChefHat,
+    },
 ];
 
 export function MobileBottomNav() {
@@ -32,7 +37,7 @@ export function MobileBottomNav() {
     return (
         <nav className="fixed bottom-0 left-0 z-50 w-full border-t bg-background md:hidden">
             <div
-                className="grid h-16 grid-cols-4"
+                className="grid h-16 grid-cols-5"
                 style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
             >
                 {navItems.map((item) => {

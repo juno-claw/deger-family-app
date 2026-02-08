@@ -24,3 +24,21 @@ export type FamilyList = {
     created_at: string;
     updated_at: string;
 };
+
+export type Recipe = {
+    id: number;
+    title: string;
+    description: string | null;
+    category: 'cooking' | 'baking' | 'dessert' | 'snack' | 'drink';
+    servings: number | null;
+    prep_time: number | null;
+    cook_time: number | null;
+    ingredients: string;
+    instructions: string;
+    owner_id: number;
+    is_favorite: boolean;
+    owner?: User;
+    shared_with?: (User & { pivot: { permission: 'view' | 'edit' } })[];
+    created_at: string;
+    updated_at: string;
+};

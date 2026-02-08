@@ -7,11 +7,17 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class CalendarEvent extends Model
 {
     /** @use HasFactory<\Database\Factories\CalendarEventFactory> */
     use HasFactory;
+
+    /**
+     * Flag to prevent sync loops when pulling events from Google.
+     */
+    public static bool $syncingFromGoogle = false;
 
     /**
      * The attributes that are mass assignable.
@@ -59,6 +65,14 @@ class CalendarEvent extends Model
         return $this->belongsToMany(User::class, 'calendar_event_user')
             ->withPivot('status')
             ->withTimestamps();
+    }
+
+    /**
+     * Google Calendar sync mappings for this event.
+     */
+    public function googleSyncMappings(): HasMany
+    {
+        return $this->hasMany(GoogleCalendarSyncMapping::class);
     }
 
     /**

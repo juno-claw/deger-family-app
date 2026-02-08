@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Settings\GoogleCalendarController;
 use App\Http\Controllers\Settings\PasswordController;
 use App\Http\Controllers\Settings\ProfileController;
 use App\Http\Controllers\Settings\TwoFactorAuthenticationController;
@@ -28,4 +29,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::get('settings/two-factor', [TwoFactorAuthenticationController::class, 'show'])
         ->name('two-factor.show');
+
+    Route::get('settings/google-calendar', [GoogleCalendarController::class, 'show'])
+        ->name('google-calendar.show');
+    Route::get('settings/google-calendar/connect', [GoogleCalendarController::class, 'redirect'])
+        ->name('google-calendar.redirect');
+    Route::get('settings/google-calendar/callback', [GoogleCalendarController::class, 'callback'])
+        ->name('google-calendar.callback');
+    Route::delete('settings/google-calendar/disconnect', [GoogleCalendarController::class, 'disconnect'])
+        ->name('google-calendar.disconnect');
 });

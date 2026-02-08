@@ -7,11 +7,16 @@ use App\Http\Requests\StoreListRequest;
 use App\Http\Requests\UpdateListRequest;
 use App\Http\Resources\ListResource;
 use App\Models\FamilyList;
+use App\Traits\HasApiSharing;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Response;
 
 class ListApiController extends Controller
 {
+    use HasApiSharing;
+
     /**
      * Display a listing of lists accessible by the authenticated user.
      */
@@ -80,5 +85,53 @@ class ListApiController extends Controller
         $list->delete();
 
         return response()->noContent();
+    }
+
+    /**
+     * Share the list with another user.
+     */
+    public function share(Request $request, FamilyList $list): ListResource
+    {
+        return $this->performApiShare($request, $list);
+    }
+
+    /**
+     * Remove sharing of the list from a user.
+     */
+    public function unshare(Request $request, FamilyList $list): ListResource
+    {
+        return $this->performApiUnshare($request, $list);
+    }
+
+    // ── HasApiSharing implementation ─────────────────────
+
+    protected function sharingPivotField(): string
+    {
+        return 'permission';
+    }
+
+    protected function sharingNotificationType(): string
+    {
+        return 'list_shared';
+    }
+
+    protected function sharingNotificationTitle(): string
+    {
+        return 'Liste geteilt';
+    }
+
+    protected function sharingNotificationMessage(Model $resource): string
+    {
+        return auth()->user()->name.' hat die Liste "'.$resource->title.'" mit dir geteilt.';
+    }
+
+    protected function sharingNotificationData(Model $resource): array
+    {
+        return ['list_id' => $resource->id];
+    }
+
+    protected function sharingResource(Model $resource): ListResource
+    {
+        return new ListResource($resource);
     }
 }

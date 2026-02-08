@@ -5,6 +5,7 @@ use App\Http\Controllers\ListController;
 use App\Http\Controllers\ListItemController;
 use App\Http\Controllers\NoteController;
 use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\RecipeController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -40,6 +41,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::patch('notes/{note}/pin', [NoteController::class, 'togglePin'])->name('notes.pin');
     Route::post('notes/{note}/share', [NoteController::class, 'share'])->name('notes.share');
     Route::delete('notes/{note}/unshare', [NoteController::class, 'unshare'])->name('notes.unshare');
+
+    Route::resource('recipes', RecipeController::class);
+    Route::patch('recipes/{recipe}/favorite', [RecipeController::class, 'toggleFavorite'])->name('recipes.favorite');
+    Route::post('recipes/{recipe}/share', [RecipeController::class, 'share'])->name('recipes.share');
+    Route::delete('recipes/{recipe}/unshare', [RecipeController::class, 'unshare'])->name('recipes.unshare');
 
     Route::get('notifications', [NotificationController::class, 'index'])->name('notifications.index');
     Route::patch('notifications/{notification}/read', [NotificationController::class, 'markAsRead'])->name('notifications.read');

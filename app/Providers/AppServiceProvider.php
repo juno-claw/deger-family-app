@@ -5,6 +5,7 @@ namespace App\Providers;
 use App\Models\CalendarEvent;
 use App\Models\FamilyList;
 use App\Models\Note;
+use App\Observers\CalendarEventObserver;
 use App\Policies\CalendarEventPolicy;
 use App\Policies\FamilyListPolicy;
 use App\Policies\NotePolicy;
@@ -37,6 +38,8 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(CalendarEvent::class, CalendarEventPolicy::class);
         Gate::policy(FamilyList::class, FamilyListPolicy::class);
         Gate::policy(Note::class, NotePolicy::class);
+
+        CalendarEvent::observe(CalendarEventObserver::class);
 
         Route::model('list', FamilyList::class);
 
