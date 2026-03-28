@@ -5,8 +5,10 @@ namespace App\Http\Controllers;
 use App\Http\Requests\StoreCalendarEventRequest;
 use App\Http\Requests\UpdateCalendarEventRequest;
 use App\Models\CalendarEvent;
+use App\Models\EventReminder;
 use App\Models\User;
 use App\Traits\HasSharing;
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -44,7 +46,7 @@ class CalendarEventController extends Controller
             })
             ->get();
 
-        $events->load(['owner', 'sharedWith']);
+        $events->load(['owner', 'sharedWith', 'reminders.user']);
 
         // Apply default color if none is set
         $events->each(function ($event): void {
@@ -63,10 +65,16 @@ class CalendarEventController extends Controller
      */
     public function store(StoreCalendarEventRequest $request): RedirectResponse
     {
-        CalendarEvent::create(array_merge(
-            $request->validated(),
+        $validated = $request->validated();
+        $reminders = $validated['reminders'] ?? [];
+        unset($validated['reminders']);
+
+        $event = CalendarEvent::create(array_merge(
+            $validated,
             ['owner_id' => auth()->id()]
         ));
+
+        $this->syncReminders($event, $reminders);
 
         return redirect()->back();
     }
@@ -78,7 +86,7 @@ class CalendarEventController extends Controller
     {
         $this->authorize('view', $event);
 
-        $event->load(['owner', 'sharedWith']);
+        $event->load(['owner', 'sharedWith', 'reminders.user']);
 
         return Inertia::render('calendar/show', compact('event'));
     }
@@ -90,7 +98,16 @@ class CalendarEventController extends Controller
     {
         $this->authorize('update', $event);
 
-        $event->update($request->validated());
+        $validated = $request->validated();
+        $reminders = $validated['reminders'] ?? null;
+        unset($validated['reminders']);
+
+        $event->update($validated);
+
+        if ($reminders !== null) {
+            $event->reminders()->whereNull('sent_at')->delete();
+            $this->syncReminders($event, $reminders);
+        }
 
         return redirect()->back();
     }
@@ -113,6 +130,29 @@ class CalendarEventController extends Controller
     public function share(Request $request, CalendarEvent $event): RedirectResponse
     {
         return $this->performShare($request, $event);
+    }
+
+    /**
+     * @param  array<int, array{type: string, minutes_before?: int|null, remind_at?: string|null, user_ids: list<int>}>  $reminders
+     */
+    private function syncReminders(CalendarEvent $event, array $reminders): void
+    {
+        foreach ($reminders as $reminderData) {
+            $userIds = $reminderData['user_ids'] ?? [];
+            foreach ($userIds as $userId) {
+                $remindAt = $reminderData['type'] === 'relative' && ! empty($reminderData['minutes_before'])
+                    ? $event->start_at->copy()->subMinutes((int) $reminderData['minutes_before'])
+                    : Carbon::parse($reminderData['remind_at']);
+
+                EventReminder::create([
+                    'calendar_event_id' => $event->id,
+                    'user_id' => $userId,
+                    'type' => $reminderData['type'],
+                    'minutes_before' => $reminderData['minutes_before'] ?? null,
+                    'remind_at' => $remindAt,
+                ]);
+            }
+        }
     }
 
     // ── HasSharing implementation ─────────────────────

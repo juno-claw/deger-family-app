@@ -25,6 +25,7 @@ class CalendarEventResource extends JsonResource
             'color' => $this->color,
             'owner' => new UserResource($this->whenLoaded('owner')),
             'shared_with' => UserResource::collection($this->whenLoaded('sharedWith')),
+            'reminders' => EventReminderResource::collection($this->whenLoaded('reminders')),
             'created_at' => $this->created_at,
         ];
     }

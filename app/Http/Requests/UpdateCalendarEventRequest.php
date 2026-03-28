@@ -6,17 +6,12 @@ use Illuminate\Foundation\Http\FormRequest;
 
 class UpdateCalendarEventRequest extends FormRequest
 {
-    /**
-     * Determine if the user is authorized to make this request.
-     */
     public function authorize(): bool
     {
         return true;
     }
 
     /**
-     * Get the validation rules that apply to the request.
-     *
      * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array<mixed>|string>
      */
     public function rules(): array
@@ -29,6 +24,12 @@ class UpdateCalendarEventRequest extends FormRequest
             'all_day' => 'sometimes|boolean',
             'recurrence' => 'sometimes|in:none,daily,weekly,monthly,yearly',
             'color' => 'sometimes|nullable|string|max:7',
+            'reminders' => 'nullable|array',
+            'reminders.*.type' => 'required_with:reminders|in:absolute,relative',
+            'reminders.*.minutes_before' => 'required_if:reminders.*.type,relative|nullable|integer|min:1',
+            'reminders.*.remind_at' => 'required_if:reminders.*.type,absolute|nullable|date',
+            'reminders.*.user_ids' => 'required_with:reminders|array|min:1',
+            'reminders.*.user_ids.*' => 'exists:users,id',
         ];
     }
 }

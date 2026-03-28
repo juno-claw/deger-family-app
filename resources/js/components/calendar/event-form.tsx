@@ -1,7 +1,8 @@
-import { router, useForm } from '@inertiajs/react';
-import { Trash2Icon } from 'lucide-react';
+import { router, useForm, usePage } from '@inertiajs/react';
+import { BellIcon, PlusIcon, Trash2Icon, XIcon } from 'lucide-react';
 import { type FormEvent, useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import {
     Dialog,
@@ -24,7 +25,8 @@ import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import InputError from '@/components/input-error';
 import { cn } from '@/lib/utils';
-import type { CalendarEvent } from '@/types/calendar';
+import type { SharedData, User } from '@/types';
+import type { CalendarEvent, EventReminder } from '@/types/calendar';
 
 const COLORS = [
     { value: '#3b82f6', label: 'Blau' },
@@ -44,11 +46,29 @@ const RECURRENCE_OPTIONS = [
     { value: 'yearly', label: 'Jährlich' },
 ];
 
+const RELATIVE_PRESETS = [
+    { value: 15, label: '15 Minuten vorher' },
+    { value: 30, label: '30 Minuten vorher' },
+    { value: 60, label: '1 Stunde vorher' },
+    { value: 120, label: '2 Stunden vorher' },
+    { value: 1440, label: '1 Tag vorher' },
+    { value: 2880, label: '2 Tage vorher' },
+    { value: 10080, label: '1 Woche vorher' },
+];
+
+interface ReminderFormData {
+    type: 'absolute' | 'relative';
+    minutes_before: number | null;
+    remind_at: string;
+    user_ids: number[];
+}
+
 interface EventFormProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     event?: CalendarEvent | null;
     defaultDate?: Date;
+    users?: User[];
 }
 
 function formatDateForInput(date: Date): string {
@@ -65,8 +85,38 @@ function formatDateTimeForInput(date: Date): string {
     return `${dateStr}T${hours}:${minutes}`;
 }
 
-function getInitialFormData(event?: CalendarEvent | null, defaultDate?: Date) {
+function groupRemindersForForm(reminders: EventReminder[]): ReminderFormData[] {
+    const groups = new Map<string, ReminderFormData>();
+
+    for (const r of reminders) {
+        const key = r.type === 'relative'
+            ? `relative-${r.minutes_before}`
+            : `absolute-${r.remind_at}`;
+
+        const existing = groups.get(key);
+        if (existing) {
+            if (!existing.user_ids.includes(r.user_id)) {
+                existing.user_ids.push(r.user_id);
+            }
+        } else {
+            groups.set(key, {
+                type: r.type,
+                minutes_before: r.minutes_before,
+                remind_at: r.remind_at?.slice(0, 16) ?? '',
+                user_ids: [r.user_id],
+            });
+        }
+    }
+
+    return Array.from(groups.values());
+}
+
+function getInitialFormData(event?: CalendarEvent | null, defaultDate?: Date, currentUserId?: number) {
     const initialDate = defaultDate ?? new Date();
+
+    const existingReminders = event?.reminders
+        ? groupRemindersForForm(event.reminders.filter((r) => !r.sent_at))
+        : [];
 
     return {
         title: event?.title ?? '',
@@ -84,15 +134,20 @@ function getInitialFormData(event?: CalendarEvent | null, defaultDate?: Date) {
         all_day: event?.all_day ?? true,
         recurrence: event?.recurrence ?? ('none' as CalendarEvent['recurrence']),
         color: event?.color ?? '',
+        reminders: existingReminders as ReminderFormData[],
     };
 }
 
-export function EventForm({ open, onOpenChange, event, defaultDate }: EventFormProps) {
+export function EventForm({ open, onOpenChange, event, defaultDate, users = [] }: EventFormProps) {
     const isEditing = !!event;
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+    const { auth } = usePage<SharedData>().props;
+    const currentUser = auth.user;
+
+    const allUsers: User[] = [currentUser, ...users.filter((u) => u.id !== currentUser.id)];
 
     const { data, setData, post, put, processing, errors, reset } = useForm(
-        getInitialFormData(event, defaultDate),
+        getInitialFormData(event, defaultDate, currentUser.id),
     );
 
     function handleSubmit(e: FormEvent) {
@@ -157,6 +212,43 @@ export function EventForm({ open, onOpenChange, event, defaultDate }: EventFormP
         }
     }
 
+    function addReminder() {
+        setData('reminders', [
+            ...data.reminders,
+            {
+                type: 'relative' as const,
+                minutes_before: 60,
+                remind_at: '',
+                user_ids: allUsers.map((u) => u.id),
+            },
+        ]);
+    }
+
+    function removeReminder(index: number) {
+        setData(
+            'reminders',
+            data.reminders.filter((_, i) => i !== index),
+        );
+    }
+
+    function updateReminder(index: number, updates: Partial<ReminderFormData>) {
+        setData(
+            'reminders',
+            data.reminders.map((r, i) => (i === index ? { ...r, ...updates } : r)),
+        );
+    }
+
+    function toggleReminderUser(index: number, userId: number) {
+        const reminder = data.reminders[index];
+        const userIds = reminder.user_ids.includes(userId)
+            ? reminder.user_ids.filter((id) => id !== userId)
+            : [...reminder.user_ids, userId];
+
+        if (userIds.length > 0) {
+            updateReminder(index, { user_ids: userIds });
+        }
+    }
+
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-md">
@@ -172,7 +264,6 @@ export function EventForm({ open, onOpenChange, event, defaultDate }: EventFormP
                 </DialogHeader>
 
                 <form onSubmit={handleSubmit} className="space-y-4">
-                    {/* Title */}
                     <div className="space-y-2">
                         <Label htmlFor="title">Titel</Label>
                         <Input
@@ -185,7 +276,6 @@ export function EventForm({ open, onOpenChange, event, defaultDate }: EventFormP
                         <InputError message={errors.title} />
                     </div>
 
-                    {/* Description */}
                     <div className="space-y-2">
                         <Label htmlFor="description">Beschreibung</Label>
                         <Textarea
@@ -198,7 +288,6 @@ export function EventForm({ open, onOpenChange, event, defaultDate }: EventFormP
                         <InputError message={errors.description} />
                     </div>
 
-                    {/* All Day Toggle */}
                     <div className="flex items-center justify-between">
                         <Label htmlFor="all_day">Ganztägig</Label>
                         <Switch
@@ -208,7 +297,6 @@ export function EventForm({ open, onOpenChange, event, defaultDate }: EventFormP
                         />
                     </div>
 
-                    {/* Start Date/Time */}
                     <div className="space-y-2">
                         <Label htmlFor="start_at">
                             {data.all_day ? 'Startdatum' : 'Start'}
@@ -222,7 +310,6 @@ export function EventForm({ open, onOpenChange, event, defaultDate }: EventFormP
                         <InputError message={errors.start_at} />
                     </div>
 
-                    {/* End Date/Time */}
                     <div className="space-y-2">
                         <Label htmlFor="end_at">
                             {data.all_day ? 'Enddatum' : 'Ende'}
@@ -236,7 +323,6 @@ export function EventForm({ open, onOpenChange, event, defaultDate }: EventFormP
                         <InputError message={errors.end_at} />
                     </div>
 
-                    {/* Recurrence */}
                     <div className="space-y-2">
                         <Label>Wiederholung</Label>
                         <Select
@@ -259,7 +345,6 @@ export function EventForm({ open, onOpenChange, event, defaultDate }: EventFormP
                         <InputError message={errors.recurrence} />
                     </div>
 
-                    {/* Color */}
                     <div className="space-y-2">
                         <Label>Farbe</Label>
                         <div className="flex flex-wrap gap-2">
@@ -283,6 +368,123 @@ export function EventForm({ open, onOpenChange, event, defaultDate }: EventFormP
                             ))}
                         </div>
                         <InputError message={errors.color} />
+                    </div>
+
+                    {/* Reminders */}
+                    <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                            <Label className="flex items-center gap-1.5">
+                                <BellIcon className="size-4" />
+                                Erinnerungen
+                            </Label>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={addReminder}
+                            >
+                                <PlusIcon className="mr-1 size-3.5" />
+                                Hinzufügen
+                            </Button>
+                        </div>
+
+                        {data.reminders.length === 0 && (
+                            <p className="text-muted-foreground text-sm">
+                                Keine Erinnerungen gesetzt.
+                            </p>
+                        )}
+
+                        {data.reminders.map((reminder, idx) => (
+                            <div
+                                key={idx}
+                                className="bg-muted/50 space-y-3 rounded-lg border p-3"
+                            >
+                                <div className="flex items-start justify-between">
+                                    <Select
+                                        value={reminder.type}
+                                        onValueChange={(value: 'absolute' | 'relative') => {
+                                            updateReminder(idx, {
+                                                type: value,
+                                                minutes_before: value === 'relative' ? 60 : null,
+                                                remind_at: '',
+                                            });
+                                        }}
+                                    >
+                                        <SelectTrigger className="w-[160px]">
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="relative">Relativ</SelectItem>
+                                            <SelectItem value="absolute">Absolut</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="icon"
+                                        className="size-8"
+                                        onClick={() => removeReminder(idx)}
+                                    >
+                                        <XIcon className="size-4" />
+                                    </Button>
+                                </div>
+
+                                {reminder.type === 'relative' ? (
+                                    <Select
+                                        value={String(reminder.minutes_before ?? 60)}
+                                        onValueChange={(value) =>
+                                            updateReminder(idx, {
+                                                minutes_before: parseInt(value, 10),
+                                            })
+                                        }
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {RELATIVE_PRESETS.map((preset) => (
+                                                <SelectItem
+                                                    key={preset.value}
+                                                    value={String(preset.value)}
+                                                >
+                                                    {preset.label}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                ) : (
+                                    <Input
+                                        type="datetime-local"
+                                        value={reminder.remind_at}
+                                        onChange={(e) =>
+                                            updateReminder(idx, { remind_at: e.target.value })
+                                        }
+                                    />
+                                )}
+
+                                <div className="space-y-1.5">
+                                    <span className="text-muted-foreground text-xs font-medium">
+                                        Empfänger
+                                    </span>
+                                    <div className="flex flex-wrap gap-3">
+                                        {allUsers.map((user) => (
+                                            <label
+                                                key={user.id}
+                                                className="flex cursor-pointer items-center gap-1.5 text-sm"
+                                            >
+                                                <Checkbox
+                                                    checked={reminder.user_ids.includes(user.id)}
+                                                    onCheckedChange={() =>
+                                                        toggleReminderUser(idx, user.id)
+                                                    }
+                                                />
+                                                {user.name}
+                                            </label>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
                     </div>
 
                     <DialogFooter className="gap-2">

@@ -156,6 +156,7 @@ export default function CalendarIndex({ events, users, month, year }: Props) {
                 onOpenChange={setEventFormOpen}
                 event={editingEvent}
                 defaultDate={selectedDate ?? undefined}
+                users={users}
             />
         </AppLayout>
     );

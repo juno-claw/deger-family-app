@@ -1,5 +1,16 @@
 import type { User } from './auth';
 
+export interface EventReminder {
+    id?: number;
+    calendar_event_id?: number;
+    user_id: number;
+    user?: User;
+    type: 'absolute' | 'relative';
+    remind_at: string | null;
+    minutes_before: number | null;
+    sent_at?: string | null;
+}
+
 export interface CalendarEvent {
     id: number;
     title: string;
@@ -12,4 +23,5 @@ export interface CalendarEvent {
     owner_id: number;
     owner?: User;
     shared_with?: (User & { pivot: { status: string } })[];
+    reminders?: EventReminder[];
 }

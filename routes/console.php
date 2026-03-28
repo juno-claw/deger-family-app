@@ -9,3 +9,4 @@ Artisan::command('inspire', function () {
 })->purpose('Display an inspiring quote');
 
 Schedule::command('google-calendar:pull')->everyFiveMinutes();
+Schedule::command('app:send-event-reminders')->everyMinute();

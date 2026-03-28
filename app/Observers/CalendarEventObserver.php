@@ -24,6 +24,10 @@ class CalendarEventObserver
     public function updated(CalendarEvent $calendarEvent): void
     {
         $this->dispatchSync($calendarEvent, 'update');
+
+        if ($calendarEvent->wasChanged('start_at')) {
+            $this->recalculateRelativeReminders($calendarEvent);
+        }
     }
 
     /**
@@ -51,6 +55,19 @@ class CalendarEventObserver
                 );
             }
         }
+    }
+
+    /**
+     * Recalculate remind_at for all unsent relative reminders when start_at changes.
+     */
+    protected function recalculateRelativeReminders(CalendarEvent $calendarEvent): void
+    {
+        $calendarEvent->reminders()
+            ->where('type', 'relative')
+            ->whereNull('sent_at')
+            ->each(function ($reminder) {
+                $reminder->recalculateRemindAt();
+            });
     }
 
     /**

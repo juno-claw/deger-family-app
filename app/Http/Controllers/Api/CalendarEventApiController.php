@@ -44,7 +44,7 @@ class CalendarEventApiController extends Controller
                         ->where('end_at', '>=', $dateTo);
                 });
         })
-            ->with(['owner', 'sharedWith'])
+            ->with(['owner', 'sharedWith', 'reminders.user'])
             ->get();
 
         return CalendarEventResource::collection($events);
@@ -60,7 +60,7 @@ class CalendarEventApiController extends Controller
             'owner_id' => auth()->id(),
         ]);
 
-        $event->load(['owner', 'sharedWith']);
+        $event->load(['owner', 'sharedWith', 'reminders.user']);
 
         return new CalendarEventResource($event);
     }
@@ -72,7 +72,7 @@ class CalendarEventApiController extends Controller
     {
         $this->authorize('view', $event);
 
-        $event->load(['owner', 'sharedWith']);
+        $event->load(['owner', 'sharedWith', 'reminders.user']);
 
         return new CalendarEventResource($event);
     }
@@ -86,7 +86,7 @@ class CalendarEventApiController extends Controller
 
         $event->update($request->validated());
 
-        $event->load(['owner', 'sharedWith']);
+        $event->load(['owner', 'sharedWith', 'reminders.user']);
 
         return new CalendarEventResource($event);
     }

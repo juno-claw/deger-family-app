@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\CalendarEventApiController;
+use App\Http\Controllers\Api\EventReminderApiController;
 use App\Http\Controllers\Api\GoogleCalendarApiController;
 use App\Http\Controllers\Api\ListApiController;
 use App\Http\Controllers\Api\ListItemApiController;
@@ -40,6 +41,12 @@ Route::prefix('v1')->middleware('auth:sanctum')->name('api.')->group(function ()
     Route::apiResource('calendar/events', CalendarEventApiController::class);
     Route::post('calendar/events/{event}/share', [CalendarEventApiController::class, 'share'])->name('events.share');
     Route::delete('calendar/events/{event}/share', [CalendarEventApiController::class, 'unshare'])->name('events.unshare');
+
+    // Event Reminders
+    Route::get('calendar/events/{event}/reminders', [EventReminderApiController::class, 'index'])->name('events.reminders.index');
+    Route::post('calendar/events/{event}/reminders', [EventReminderApiController::class, 'store'])->name('events.reminders.store');
+    Route::put('calendar/events/{event}/reminders/{reminder}', [EventReminderApiController::class, 'update'])->name('events.reminders.update');
+    Route::delete('calendar/events/{event}/reminders/{reminder}', [EventReminderApiController::class, 'destroy'])->name('events.reminders.destroy');
 
     // Notes
     Route::apiResource('notes', NoteApiController::class);

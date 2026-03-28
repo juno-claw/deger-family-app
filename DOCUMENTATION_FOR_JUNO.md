@@ -54,6 +54,12 @@ Alle Inhalte koennen Besitzern gehoeren und mit anderen Usern geteilt werden. Zu
 - `PUT /calendar/events/{event}` - Termin aktualisieren.
 - `DELETE /calendar/events/{event}` - Termin loeschen.
 
+### Event Reminders
+- `GET /calendar/events/{event}/reminders` - Alle Erinnerungen eines Termins.
+- `POST /calendar/events/{event}/reminders` - Erinnerung erstellen.
+- `PUT /calendar/events/{event}/reminders/{reminder}` - Erinnerung aktualisieren.
+- `DELETE /calendar/events/{event}/reminders/{reminder}` - Erinnerung loeschen.
+
 ### Notes
 - `GET /notes` - Notizen, die fuer den User sichtbar sind.
 - `POST /notes` - Notiz erstellen.
@@ -164,6 +170,54 @@ Alle Inhalte koennen Besitzern gehoeren und mit anderen Usern geteilt werden. Zu
 }
 ```
 - Alle Felder optional; gleiche Regeln wie create.
+
+### Event Reminders
+
+Es gibt zwei Arten von Erinnerungen:
+- **relative**: X Minuten vor dem Event (z.B. 60 = 1 Stunde vorher, 1440 = 1 Tag vorher)
+- **absolute**: Fester Zeitpunkt (Datum + Uhrzeit)
+
+Erinnerungen werden automatisch via Telegram an den jeweiligen User geschickt, wenn der Zeitpunkt erreicht ist.
+
+**Telegram User-IDs:**
+- User 1 = Olli (Main)
+- User 2 = Sabsy
+
+**Create (`POST /calendar/events/{event}/reminders`)**
+```
+{
+  "user_id": 2,
+  "type": "relative",
+  "minutes_before": 1440
+}
+```
+- `user_id`: required, exists in users
+- `type`: required, `absolute` | `relative`
+- `remind_at`: required wenn type=absolute, date (Zeitpunkt der Erinnerung)
+- `minutes_before`: required wenn type=relative, integer >= 1 (Minuten vor Event-Start)
+
+Beispiel absolut:
+```
+{
+  "user_id": 1,
+  "type": "absolute",
+  "remind_at": "2026-03-15T09:00:00"
+}
+```
+
+**Update (`PUT /calendar/events/{event}/reminders/{reminder}`)**
+```
+{
+  "type": "relative",
+  "minutes_before": 120
+}
+```
+- Alle Felder optional; gleiche Regeln wie create.
+
+**Delete (`DELETE /calendar/events/{event}/reminders/{reminder}`)**
+- Keine Request-Body noetig.
+
+**Automatische Neuberechnung:** Wenn sich `start_at` eines Events aendert, werden alle relativen (nicht versendeten) Erinnerungen automatisch neu berechnet.
 
 ### Notes
 **Create (`POST /notes`)**
@@ -299,6 +353,12 @@ Alle Inhalte koennen Besitzern gehoeren und mit anderen Usern geteilt werden. Zu
 - `id`, `title`, `description`, `start_at`, `end_at`, `all_day`, `recurrence`, `color`
 - `owner` (UserResource)
 - `shared_with` (UserResource[])
+- `reminders` (EventReminderResource[])
+- `created_at`
+
+**EventReminderResource**
+- `id`, `calendar_event_id`, `user_id`, `type`, `remind_at`, `minutes_before`, `sent_at`
+- `user` (UserResource)
 - `created_at`
 
 **NoteResource**
@@ -605,3 +665,73 @@ Sobald die Verbindung aktiv ist:
 - Worker neustarten: `sudo supervisorctl restart deger-family-worker:*`
 - Worker Log: `/var/www/html/deger-family-app/storage/logs/worker.log`
 - Manuell Pull ausfuehren: `php artisan google-calendar:pull`
+
+---
+
+## Event-Erinnerungen (Telegram Reminders)
+
+### Funktionsweise
+
+Event-Erinnerungen werden automatisch via Telegram verschickt. Der Ablauf ist vollstaendig asynchron:
+
+1. Ein Reminder wird erstellt (via UI oder API) mit einem Zeitpunkt (`remind_at`)
+2. Der Scheduler fuehrt jede Minute `app:send-event-reminders` aus
+3. Faellige Reminders (wo `remind_at <= now()` und noch nicht gesendet) werden als Queue-Jobs dispatcht
+4. Der Queue-Worker verarbeitet die Jobs und sendet Telegram-Nachrichten via `NotificationService` und `TelegramService`
+5. Nach erfolgreichem Versand wird `sent_at` gesetzt
+
+### Telegram-Konfiguration
+
+Die Telegram Bot-Tokens und Chat-IDs sind per User konfiguriert:
+- **User 1 (Olli):** `TELEGRAM_OLLI_BOT_TOKEN`, `TELEGRAM_OLLI_CHAT_ID`
+- **User 2 (Sabsy):** `TELEGRAM_SABSY_BOT_TOKEN`, `TELEGRAM_SABSY_CHAT_ID`
+
+### Reminder-Typen
+
+| Typ | Beschreibung | Beispiel |
+|---|---|---|
+| `relative` | X Minuten vor dem Event | `minutes_before: 1440` (1 Tag vorher) |
+| `absolute` | Fester Zeitpunkt | `remind_at: "2026-03-15T09:00:00"` |
+
+### Haeufige Werte fuer `minutes_before`
+
+| Minuten | Bedeutung |
+|---|---|
+| 15 | 15 Minuten vorher |
+| 30 | 30 Minuten vorher |
+| 60 | 1 Stunde vorher |
+| 120 | 2 Stunden vorher |
+| 1440 | 1 Tag vorher |
+| 2880 | 2 Tage vorher |
+| 10080 | 1 Woche vorher |
+
+### API-Beispiel: Termin mit Erinnerung erstellen
+
+```bash
+# 1. Termin erstellen
+curl -X POST {{BASE_URL}}/api/v1/calendar/events \
+  -H "Authorization: Bearer {{TOKEN}}" \
+  -H "Accept: application/json" \
+  -H "Content-Type: application/json" \
+  -d '{"title": "Zahnarzt", "start_at": "2026-03-15T10:00:00", "all_day": false}'
+
+# 2. Erinnerung fuer Olli: 1 Tag vorher
+curl -X POST {{BASE_URL}}/api/v1/calendar/events/42/reminders \
+  -H "Authorization: Bearer {{TOKEN}}" \
+  -H "Accept: application/json" \
+  -H "Content-Type: application/json" \
+  -d '{"user_id": 1, "type": "relative", "minutes_before": 1440}'
+
+# 3. Erinnerung fuer Sabsy: 2 Stunden vorher
+curl -X POST {{BASE_URL}}/api/v1/calendar/events/42/reminders \
+  -H "Authorization: Bearer {{TOKEN}}" \
+  -H "Accept: application/json" \
+  -H "Content-Type: application/json" \
+  -d '{"user_id": 2, "type": "relative", "minutes_before": 120}'
+```
+
+### Manueller Test
+
+```bash
+php artisan app:send-event-reminders
+```

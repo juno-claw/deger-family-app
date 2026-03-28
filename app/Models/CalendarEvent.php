@@ -68,6 +68,14 @@ class CalendarEvent extends Model
     }
 
     /**
+     * Reminders for this event.
+     */
+    public function reminders(): HasMany
+    {
+        return $this->hasMany(EventReminder::class);
+    }
+
+    /**
      * Google Calendar sync mappings for this event.
      */
     public function googleSyncMappings(): HasMany

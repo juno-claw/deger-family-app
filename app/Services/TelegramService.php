@@ -94,7 +94,7 @@ class TelegramService
 
         $path = match ($notification->type) {
             'list_shared' => isset($data['list_id']) ? "/lists/{$data['list_id']}" : null,
-            'event_shared' => '/calendar',
+            'event_shared', 'event_reminder' => '/calendar',
             'note_shared' => isset($data['note_id']) ? "/notes/{$data['note_id']}" : null,
             'recipe_shared' => isset($data['recipe_id']) ? "/recipes/{$data['recipe_id']}" : null,
             default => null,
